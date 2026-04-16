@@ -1,4 +1,4 @@
-# Attendance Management System (Java Swing + MySQL)
+[# Attendance Management System (Java Swing + MySQL)
 
 A Java 17+ desktop application for managing student attendance using Swing and MySQL.
 
@@ -73,3 +73,4 @@ java -cp "out;lib/*" main.App
 - DB exceptions are displayed as error dialogs.
 - Validation issues are shown in panel status labels.
 - Startup validates DB connectivity and offers retry.
+](https://github.com/anuragpatil1729/Attendance-Tracking-System.git)
