@@ -1,5 +1,9 @@
+ HEAD
 /out/
 *.class
 config.properties
 attendance_local.db
 *.csv
+
+.DS_Store
+ a2c37ba (ignore DS_Store)
