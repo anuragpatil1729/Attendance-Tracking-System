@@ -1,5 +1,10 @@
-db.host=
-db.port=3306
-db.name=
-db.user=
+# Aiven MySQL credentials
+# Get these from your Aiven console → Service → Connection Info
+db.host=mysql-yourproject.aivencloud.com
+db.port=12345
+db.name=defaultdb
+db.user=avnadmin
 db.password=
+
+# Optional: path to Aiven CA certificate (leave blank to skip)
+db.ssl.ca=
