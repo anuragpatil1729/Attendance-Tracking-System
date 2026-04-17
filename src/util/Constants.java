@@ -9,7 +9,7 @@ import java.awt.Font;
 public final class Constants {
     public static final String DB_URL = "jdbc:mysql://localhost:3306/attendance_db?useSSL=false&serverTimezone=UTC";
     public static final String DB_USER = "root";
-    public static final String DB_PASSWORD = "your_password_here";
+    public static final String DB_PASSWORD = "anuragpatil";
 
     public static final String APP_TITLE = "Attendance Manager";
     public static final int WINDOW_W = 1100;
