@@ -5,58 +5,98 @@ import model.Session;
 
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SessionService {
-    public Session getActiveSession() {
-        try (Connection conn = CloudDBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT * FROM sessions WHERE is_open=1 ORDER BY id DESC LIMIT 1");
-             ResultSet rs = ps.executeQuery()) {
-            if (!rs.next()) {
-                return null;
-            }
-            return map(rs);
-        } catch (Exception e) {
-            throw new RuntimeException("Unable to load active session", e);
-        }
-    }
 
-    public void createAndOpen(String name, String subject, String type, int officerId, int lockDurationMinutes, LocalDateTime openTime) {
-        String sql = "INSERT INTO sessions(name, subject, opened_by, open_time, lock_duration_minutes, is_open, session_type) VALUES (?,?,?,?,?,1,?)";
-        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+    // ✅ Create + Open Session
+    public void createAndOpen(String name, String subject, String type,
+            int userId, int lockDuration, LocalDateTime time) {
+
+        String sql = "INSERT INTO sessions (name, subject, session_type, opened_by, open_time, lock_duration_minutes, is_open) VALUES (?, ?, ?, ?, ?, ?, 1)";
+
+        try (Connection conn = CloudDBConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setString(1, name);
             ps.setString(2, subject);
-            ps.setInt(3, officerId);
-            ps.setTimestamp(4, Timestamp.valueOf(openTime));
-            ps.setInt(5, lockDurationMinutes);
-            ps.setString(6, type);
+            ps.setString(3, type);
+            ps.setInt(4, userId);
+            ps.setTimestamp(5, Timestamp.valueOf(time));
+            ps.setInt(6, lockDuration);
+
             ps.executeUpdate();
+
         } catch (Exception e) {
-            throw new RuntimeException("Unable to create session", e);
+            throw new RuntimeException("Failed to create session", e);
         }
     }
 
-    public void closeSession(int id) {
+    public Session getActiveSession() {
+        String sql = "SELECT * FROM sessions WHERE is_open = 1 LIMIT 1";
+
         try (Connection conn = CloudDBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement("UPDATE sessions SET is_open=0, close_time=CURRENT_TIMESTAMP WHERE id=?")) {
-            ps.setInt(1, id);
-            ps.executeUpdate();
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+
+            if (rs.next()) {
+                Session s = new Session();
+
+                s.setId(rs.getInt("id"));
+                s.setName(rs.getString("name"));
+                s.setSubject(rs.getString("subject"));
+                s.setSessionType(rs.getString("session_type"));
+
+                return s;
+            }
+
         } catch (Exception e) {
-            throw new RuntimeException("Unable to close session", e);
+            throw new RuntimeException("Failed to fetch active session", e);
+        }
+
+        return null;
+    }
+
+    public void closeSession(int sessionId) {
+        String sql = "UPDATE sessions SET is_open=0, close_time=NOW() WHERE id=?";
+
+        try (Connection conn = CloudDBConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, sessionId);
+            ps.executeUpdate();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to close session", e);
         }
     }
 
-    private Session map(ResultSet rs) throws SQLException {
-        Session s = new Session();
-        s.setId(rs.getInt("id"));
-        s.setName(rs.getString("name"));
-        s.setSubject(rs.getString("subject"));
-        s.setSessionType(rs.getString("session_type"));
-        s.setLockDurationMinutes(rs.getInt("lock_duration_minutes"));
-        Timestamp open = rs.getTimestamp("open_time");
-        if (open != null) s.setOpenTime(open.toLocalDateTime());
-        Timestamp close = rs.getTimestamp("close_time");
-        if (close != null) s.setCloseTime(close.toLocalDateTime());
-        s.setOpen(rs.getBoolean("is_open"));
-        return s;
+    // 🔥 FETCH OPEN SESSIONS (THIS FIXES YOUR UI)
+    public List<Session> getOpenSessions() {
+        List<Session> list = new ArrayList<>();
+
+        String sql = "SELECT * FROM sessions WHERE is_open = 1";
+
+        try (Connection conn = CloudDBConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql);
+                ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                Session s = new Session();
+
+                s.setId(rs.getInt("id"));
+                s.setName(rs.getString("name"));
+                s.setSubject(rs.getString("subject"));
+                s.setSessionType(rs.getString("session_type"));
+
+                list.add(s);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch sessions", e);
+        }
+
+        return list;
     }
 }

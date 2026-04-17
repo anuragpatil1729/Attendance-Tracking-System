@@ -11,13 +11,17 @@ import java.sql.ResultSet;
 public class AuthService {
     public User login(String username, String password) {
         try (Connection conn = CloudDBConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE username=? AND is_active=1")) {
+                PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE username=? AND is_active=1")) {
             ps.setString(1, username);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
                 }
                 String hash = rs.getString("password_hash");
+
+                System.out.println("INPUT PASSWORD: [" + password + "]");
+                System.out.println("DB HASH: " + hash);
+                System.out.println("MATCH RESULT: " + PasswordUtil.verify(password, hash));
                 if (!PasswordUtil.verify(password, hash)) {
                     return null;
                 }

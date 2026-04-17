@@ -14,6 +14,7 @@ import java.awt.*;
 import java.util.prefs.Preferences;
 
 public class LoginFrame extends JFrame {
+
     private final JTextField username = new JTextField();
     private final JPasswordField password = new JPasswordField();
     private final JCheckBox remember = new JCheckBox("Remember Me");
@@ -37,19 +38,25 @@ public class LoginFrame extends JFrame {
         JPanel card = new JPanel();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(Constants.SIDEBAR);
-        card.setBorder(BorderFactory.createCompoundBorder(new RoundedBorder(20), BorderFactory.createEmptyBorder(20, 24, 20, 24)));
+        card.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(20),
+                BorderFactory.createEmptyBorder(20, 24, 20, 24)));
         card.setPreferredSize(new Dimension(380, 300));
 
         JLabel logo = new JLabel("🐾 Smart Attendance", SwingConstants.CENTER);
         logo.setFont(Constants.FONT.deriveFont(Font.BOLD, 24f));
         logo.setForeground(Constants.ACCENT);
 
-        StatusBadge badge = new StatusBadge(NetworkUtil.isOnline() ? "Online" : "Offline", NetworkUtil.isOnline());
+        StatusBadge badge = new StatusBadge(
+                NetworkUtil.isOnline() ? "Online" : "Offline",
+                NetworkUtil.isOnline());
         badge.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         styleField(username, "Username");
         styleField(password, "Password");
-        remember.setOpaque(false); remember.setForeground(Constants.TEXT);
+
+        remember.setOpaque(false);
+        remember.setForeground(Constants.TEXT);
 
         JButton toggle = button("Show/Hide");
         toggle.addActionListener(e -> password.setEchoChar(password.getEchoChar() == 0 ? '•' : (char) 0));
@@ -57,11 +64,23 @@ public class LoginFrame extends JFrame {
         JButton loginBtn = button("Login");
         loginBtn.addActionListener(e -> login(card));
 
-        card.add(logo); card.add(Box.createVerticalStrut(8)); card.add(badge); card.add(Box.createVerticalStrut(14));
-        card.add(username); card.add(Box.createVerticalStrut(8));
-        card.add(password); card.add(Box.createVerticalStrut(8));
-        card.add(toggle); card.add(Box.createVerticalStrut(6));
-        card.add(remember); card.add(Box.createVerticalStrut(14));
+        card.add(logo);
+        card.add(Box.createVerticalStrut(8));
+        card.add(badge);
+        card.add(Box.createVerticalStrut(14));
+
+        card.add(username);
+        card.add(Box.createVerticalStrut(8));
+
+        card.add(password);
+        card.add(Box.createVerticalStrut(8));
+
+        card.add(toggle);
+        card.add(Box.createVerticalStrut(6));
+
+        card.add(remember);
+        card.add(Box.createVerticalStrut(14));
+
         card.add(loginBtn);
 
         wrap.add(card);
@@ -70,24 +89,37 @@ public class LoginFrame extends JFrame {
 
     private void login(JPanel card) {
         new SwingWorker<User, Void>() {
+
             @Override
             protected User doInBackground() {
-                return authService.login(username.getText().trim(), new String(password.getPassword()));
+
+                // ✅ FIXED HERE (trim added)
+                return authService.login(
+                        username.getText().trim(),
+                        new String(password.getPassword()).trim());
             }
 
             @Override
             protected void done() {
                 try {
                     User user = get();
+
                     if (user == null) {
                         ShakeAnimation.shake(card);
-                        ToastNotification.showError(LoginFrame.this, "Wrong credentials. Try again ✨");
+                        ToastNotification.showError(LoginFrame.this,
+                                "Wrong credentials. Try again ✨");
                         return;
                     }
-                    if (remember.isSelected()) preferences.put("username", user.getUsername());
-                    else preferences.remove("username");
+
+                    if (remember.isSelected()) {
+                        preferences.put("username", user.getUsername());
+                    } else {
+                        preferences.remove("username");
+                    }
+
                     new MainFrame(user).setVisible(true);
                     dispose();
+
                 } catch (Exception ex) {
                     ToastNotification.showError(LoginFrame.this, ex.getMessage());
                 }
@@ -113,5 +145,7 @@ public class LoginFrame extends JFrame {
         return b;
     }
 
-    private void loadRemembered() { username.setText(preferences.get("username", "")); }
+    private void loadRemembered() {
+        username.setText(preferences.get("username", ""));
+    }
 }

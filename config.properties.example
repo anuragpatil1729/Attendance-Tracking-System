@@ -1,10 +1,7 @@
-# Aiven MySQL credentials
-# Get these from your Aiven console → Service → Connection Info
-db.host=mysql-yourproject.aivencloud.com
-db.port=12345
-db.name=defaultdb
+db.host=attendance-tracking-system-database-project-name-12345.d.aivencloud.com
+db.port=22104
+db.name=attendance_db
 db.user=avnadmin
-db.password=
-
+db.password=YOUR_PASSWORD_HERE
 # Optional: path to Aiven CA certificate (leave blank to skip)
 db.ssl.ca=
