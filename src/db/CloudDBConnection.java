@@ -1,0 +1,30 @@
+package db;
+
+import config.ConfigLoader;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public final class CloudDBConnection {
+    private CloudDBConnection() {
+    }
+
+    public static Connection getConnection() throws SQLException {
+        String host = ConfigLoader.get("db.host");
+        int port = ConfigLoader.getInt("db.port", 3306);
+        String dbName = ConfigLoader.get("db.name");
+        String user = ConfigLoader.get("db.user");
+        String pass = ConfigLoader.get("db.password");
+        String url = "jdbc:mysql://" + host + ":" + port + "/" + dbName + "?useSSL=true&serverTimezone=UTC";
+        return DriverManager.getConnection(url, user, pass);
+    }
+
+    public static boolean isReachable() {
+        try (Connection ignored = getConnection()) {
+            return true;
+        } catch (SQLException e) {
+            return false;
+        }
+    }
+}
