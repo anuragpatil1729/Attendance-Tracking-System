@@ -1,76 +1,59 @@
-[# Attendance Management System (Java Swing + MySQL)
+# Smart Attendance Management System (Java 17+, Swing, MySQL)
 
-A Java 17+ desktop application for managing student attendance using Swing and MySQL.
+A polished desktop attendance app with two roles:
+- **Attendee**: login, self-mark attendance for practical sessions, view own history/percentage.
+- **Attendance Officer**: manage sessions/accounts/reports/device logs, lecture manual CRUD, audit trail.
 
-## Features
-
-- Dark themed Swing UI (Catppuccin-inspired palette)
-- Mark attendance by date/class with inline status editing
-- View/search attendance records by date range, class, and name
-- Export current report table to CSV
-- DAO + service architecture with validation and stored procedures
-
-## Project Layout
-
-```
-attendance-system/
-├── lib/
-├── sql/
-│   ├── schema.sql
-│   └── procedures.sql
-├── src/
-│   ├── db/
-│   ├── main/
-│   ├── model/
-│   ├── service/
-│   ├── ui/
-│   └── util/
-└── README.md
-```
+## Stack
+- Java 17+
+- Swing UI + FlatLaf (Nimbus fallback)
+- Clever Cloud MySQL (remote)
+- SQLite fallback (`attendance_local.db`) for offline marking
 
 ## Setup
+1. Install Java 17+.
+2. Put required jars in `lib/`:
+   - mysql-connector-j
+   - sqlite-jdbc
+   - flatlaf
+   - jbcrypt
+3. Copy config template:
+   ```bash
+   cp config.properties.example config.properties
+   ```
+4. Fill DB credentials in `config.properties`.
+5. Initialize database:
+   ```bash
+   mysql -h <host> -P <port> -u <user> -p < sql/schema.sql
+   mysql -h <host> -P <port> -u <user> -p < sql/procedures.sql
+   ```
 
-1. Install Java 17+ and MySQL 8.x.
-2. Place `mysql-connector-j-8.x.jar` in `lib/`.
-3. Update DB password in `src/util/Constants.java`.
-
-## Database Initialization
-
-```bash
-mysql -u root -p < sql/schema.sql
-mysql -u root -p < sql/procedures.sql
-```
+## Clever Cloud notes
+- Use your Clever Cloud MySQL host/port/database/user/password.
+- Ensure incoming IP/network permissions allow your machine.
+- Keep `config.properties` local only (already gitignored).
 
 ## Compile
-
 ```bash
 find src -name "*.java" > sources.txt
 javac -cp "lib/*" -d out @sources.txt
 ```
 
 ## Run
-
+Linux/macOS:
 ```bash
 java -cp "out:lib/*" main.App
 ```
 
 Windows:
-
 ```bash
 java -cp "out;lib/*" main.App
 ```
 
-## Usage Flow
-
-1. Launch application.
-2. Open **Mark Attendance**, pick date/class, click **Load Students**.
-3. Set status/remarks and click **Save All**.
-4. Open **View Records**, filter date range/class/name and click **Search**.
-5. Click **Export CSV** to create `attendance_export_<timestamp>.csv`.
-
-## Notes
-
-- DB exceptions are displayed as error dialogs.
-- Validation issues are shown in panel status labels.
-- Startup validates DB connectivity and offers retry.
-](https://github.com/anuragpatil1729/Attendance-Tracking-System.git)
+## Implemented behavior highlights
+- Session types: practical vs lecture.
+- Practical: anti-proxy lock (IP + device fingerprint + lock window).
+- Lecture: officer-driven manual CRUD + audit logging.
+- Offline writes to SQLite with `sync_status='pending'` and UUID `local_id`.
+- Background sync every 30 seconds via `ScheduledExecutorService`.
+- DB errors are surfaced as UI toasts/dialogs.

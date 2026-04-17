@@ -1,0 +1,5 @@
+/out/
+*.class
+config.properties
+attendance_local.db
+*.csv

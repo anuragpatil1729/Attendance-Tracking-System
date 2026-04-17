@@ -1,91 +1,143 @@
 package service;
 
-import db.AttendanceDAO;
-import model.RollCall;
+import db.CloudDBConnection;
+import db.LocalDBConnection;
+import model.AttendanceRecord;
+import model.Session;
 
-import java.time.LocalDate;
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.UUID;
 
-/**
- * Service layer for validation and business workflows.
- */
 public class AttendanceService {
-    private static final Set<String> VALID_STATUSES = Set.of("Present", "Absent", "Late");
+    private final AntiProxyService antiProxyService = new AntiProxyService();
 
-    private final AttendanceDAO attendanceDAO;
+    public void markAttendance(int userId, Session session, String ip, String fingerprint, String status, String remarks) {
+        String blockMessage = antiProxyService.check(userId, session, ip, fingerprint);
+        if (blockMessage != null && "practical".equalsIgnoreCase(session.getSessionType())) {
+            logDevice(userId, ip, fingerprint, "blocked");
+            throw new RuntimeException(blockMessage);
+        }
 
-    public AttendanceService() {
-        this.attendanceDAO = new AttendanceDAO();
+        String localId = UUID.randomUUID().toString();
+        if (CloudDBConnection.isReachable()) {
+            saveCloud(userId, session.getId(), ip, fingerprint, status, remarks, localId, "synced");
+        } else {
+            saveLocal(userId, session.getId(), ip, fingerprint, status, remarks, localId);
+        }
+        logDevice(userId, ip, fingerprint, "success");
     }
 
-    public List<RollCall> getAllStudents() {
-        return attendanceDAO.getAllStudents();
+    public List<AttendanceRecord> attendeeHistory(int userId, int limit) {
+        List<AttendanceRecord> list = new ArrayList<>();
+        String sql = "SELECT * FROM attendance WHERE user_id=? ORDER BY marked_at DESC LIMIT ?";
+        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    AttendanceRecord r = new AttendanceRecord();
+                    r.setId(rs.getInt("id"));
+                    r.setSessionId(rs.getInt("session_id"));
+                    r.setUserId(userId);
+                    r.setStatus(rs.getString("status"));
+                    r.setRemarks(rs.getString("remarks"));
+                    Timestamp t = rs.getTimestamp("marked_at");
+                    if (t != null) r.setMarkedAt(t.toLocalDateTime());
+                    r.setSyncStatus(rs.getString("sync_status"));
+                    list.add(r);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load history", e);
+        }
+        return list;
     }
 
-    public List<String> getAllClasses() {
-        return attendanceDAO.getAllClasses();
-    }
-
-    public List<RollCall> getAttendanceByDate(LocalDate date) {
-        return attendanceDAO.getAttendanceByDate(date);
-    }
-
-    public List<RollCall> generateSummaryReport(LocalDate from, LocalDate to) {
-        validateDateRange(from, to);
-        return attendanceDAO.getReport(from, to, null);
-    }
-
-    public List<RollCall> generateSummaryReport(LocalDate from, LocalDate to, String cls) {
-        validateDateRange(from, to);
-        return attendanceDAO.getReport(from, to, cls);
-    }
-
-    /**
-     * Marks one attendance row after validation.
-     */
-    public void markAttendance(int studentId, LocalDate date, String status, String remarks) {
-        validateAttendanceInput(date, status);
-        attendanceDAO.markAttendance(studentId, date, status, remarks);
-    }
-
-    /**
-     * Marks multiple records in sequence.
-     */
-    public void markBulk(List<RollCall> records) {
-        for (RollCall record : records) {
-            markAttendance(
-                    record.getStudentId(),
-                    record.getDate(),
-                    record.getStatus(),
-                    record.getRemarks()
-            );
+    public void upsertLectureAttendance(int officerId, int userId, int sessionId, String status, String remarks, String action, String reason) {
+        try (Connection conn = CloudDBConnection.getConnection(); CallableStatement cs = conn.prepareCall("{CALL sp_lecture_upsert(?,?,?,?,?,?)}")) {
+            cs.setInt(1, officerId);
+            cs.setInt(2, userId);
+            cs.setInt(3, sessionId);
+            cs.setString(4, status);
+            cs.setString(5, remarks);
+            cs.setString(6, reason == null ? "manual update" : reason);
+            cs.execute();
+            insertAudit(conn, officerId, action, "attendance", sessionId, "", status + " / " + remarks, reason);
+        } catch (Exception e) {
+            throw new RuntimeException("Lecture upsert failed", e);
         }
     }
 
-    public double getAttendancePercentage(int studentId, LocalDate from, LocalDate to) {
-        validateDateRange(from, to);
-        return attendanceDAO.getAttendancePercentage(studentId, from, to);
-    }
-
-    private void validateAttendanceInput(LocalDate date, String status) {
-        if (date == null) {
-            throw new IllegalArgumentException("Date is required.");
-        }
-        if (date.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Date cannot be in the future.");
-        }
-        if (status == null || !VALID_STATUSES.contains(status)) {
-            throw new IllegalArgumentException("Status must be Present, Absent, or Late.");
+    public void deleteLectureAttendance(int officerId, int userId, int sessionId, String reason) {
+        try (Connection conn = CloudDBConnection.getConnection();
+             PreparedStatement del = conn.prepareStatement("DELETE FROM attendance WHERE user_id=? AND session_id=?")) {
+            del.setInt(1, userId);
+            del.setInt(2, sessionId);
+            del.executeUpdate();
+            insertAudit(conn, officerId, "delete", "attendance", sessionId, "record", "deleted", reason);
+        } catch (Exception e) {
+            throw new RuntimeException("Lecture delete failed", e);
         }
     }
 
-    private void validateDateRange(LocalDate from, LocalDate to) {
-        if (from == null || to == null) {
-            throw new IllegalArgumentException("From and To dates are required.");
+    private void saveCloud(int userId, int sessionId, String ip, String fingerprint, String status, String remarks, String localId, String syncStatus) {
+        String sql = "INSERT INTO attendance(user_id, session_id, status, remarks, marked_at, ip_address, device_fingerprint, sync_status, local_id) VALUES(?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?)";
+        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, sessionId);
+            ps.setString(3, status);
+            ps.setString(4, remarks);
+            ps.setString(5, ip);
+            ps.setString(6, fingerprint);
+            ps.setString(7, syncStatus);
+            ps.setString(8, localId);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Cloud save failed", e);
         }
-        if (from.isAfter(to)) {
-            throw new IllegalArgumentException("From date cannot be after To date.");
+    }
+
+    private void saveLocal(int userId, int sessionId, String ip, String fingerprint, String status, String remarks, String localId) {
+        String sql = "INSERT INTO attendance_local(user_id, session_id, status, remarks, marked_at, ip_address, device_fingerprint, sync_status, local_id) VALUES(?,?,?,?,CURRENT_TIMESTAMP,?,?, 'pending',?)";
+        try (Connection conn = LocalDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setInt(2, sessionId);
+            ps.setString(3, status);
+            ps.setString(4, remarks);
+            ps.setString(5, ip);
+            ps.setString(6, fingerprint);
+            ps.setString(7, localId);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Local save failed", e);
+        }
+    }
+
+    private void logDevice(int userId, String ip, String fingerprint, String status) {
+        String sql = "INSERT INTO device_log(user_id, ip_address, device_fingerprint, login_time, attempt_status) VALUES(?,?,?,CURRENT_TIMESTAMP,?)";
+        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ps.setString(2, ip);
+            ps.setString(3, fingerprint);
+            ps.setString(4, status);
+            ps.executeUpdate();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void insertAudit(Connection conn, int officerId, String action, String table, int targetId, String oldValue, String newValue, String reason) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("INSERT INTO audit_log(officer_id, action, target_table, target_id, old_value, new_value, reason) VALUES(?,?,?,?,?,?,?)")) {
+            ps.setInt(1, officerId);
+            ps.setString(2, action);
+            ps.setString(3, table);
+            ps.setInt(4, targetId);
+            ps.setString(5, oldValue);
+            ps.setString(6, newValue);
+            ps.setString(7, reason);
+            ps.executeUpdate();
         }
     }
 }
