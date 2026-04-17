@@ -7,7 +7,7 @@ A polished desktop attendance app with two roles:
 ## Stack
 - Java 17+
 - Swing UI + FlatLaf (Nimbus fallback)
-- Clever Cloud MySQL (remote)
+- Aiven MySQL (remote)
 - SQLite fallback (`attendance_local.db`) for offline marking
 
 ## Setup
@@ -22,16 +22,24 @@ A polished desktop attendance app with two roles:
    cp config.properties.example config.properties
    ```
 4. Fill DB credentials in `config.properties`.
-5. Initialize database:
-   ```bash
-   mysql -h <host> -P <port> -u <user> -p < sql/schema.sql
-   mysql -h <host> -P <port> -u <user> -p < sql/procedures.sql
-   ```
 
-## Clever Cloud notes
-- Use your Clever Cloud MySQL host/port/database/user/password.
-- Ensure incoming IP/network permissions allow your machine.
-- Keep `config.properties` local only (already gitignored).
+## Aiven Setup
+1. Go to https://aiven.io and sign up for free.
+2. Create a new MySQL service (free tier).
+3. Once running, click the service → "Connection Information".
+4. Copy: Host, Port, User, Password, Database name.
+5. Paste into config.properties.
+6. (Optional) Download the CA certificate and set db.ssl.ca to its path for full SSL verification.
+7. Run schema.sql and procedures.sql:
+   ```bash
+   mysql --ssl-ca=<ca-path> -h <host> -P <port> -u <user> -p <dbname> < sql/schema.sql
+   mysql --ssl-ca=<ca-path> -h <host> -P <port> -u <user> -p <dbname> < sql/procedures.sql
+   ```
+   If skipping CA cert:
+   ```bash
+   mysql -h <host> -P <port> -u <user> -p <dbname> < sql/schema.sql
+   mysql -h <host> -P <port> -u <user> -p <dbname> < sql/procedures.sql
+   ```
 
 ## Compile
 ```bash
