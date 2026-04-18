@@ -16,6 +16,7 @@ import java.sql.ResultSet;
 public class DeviceLogPanel extends JPanel {
     private final DefaultTableModel model = new DefaultTableModel(new String[]{"User", "IP", "Fingerprint", "Time", "Status"}, 0);
     private final JLabel blockedBadge = new JLabel("0 blocked attempts");
+    private Timer autoRefreshTimer;
 
     public DeviceLogPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -42,7 +43,25 @@ public class DeviceLogPanel extends JPanel {
         top.add(refresh);
         top.add(blockedBadge);
         add(top, BorderLayout.NORTH);
+
         load();
+
+        autoRefreshTimer = new Timer(5000, e -> load());
+        autoRefreshTimer.start();
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        if (autoRefreshTimer != null && !autoRefreshTimer.isRunning()) {
+            autoRefreshTimer.start();
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (autoRefreshTimer != null) autoRefreshTimer.stop();
     }
 
     private void load() {

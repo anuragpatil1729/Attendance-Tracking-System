@@ -1,9 +1,9 @@
 package ui.officer;
 
+import service.AttendanceService;
 import ui.components.ToastNotification;
 import ui.components.UiStyle;
 import util.Constants;
-import service.AttendanceService;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -20,7 +20,7 @@ import java.util.Set;
 public class AttendanceReportPanel extends JPanel {
     private static final String SEARCH_PLACEHOLDER = "Search attendee name...";
 
-    private final DefaultTableModel model = new DefaultTableModel(new String[]{"ID", "Name", "Session", "Type", "Status", "Marked At"}, 0);
+    private final DefaultTableModel model = new DefaultTableModel(new String[]{"User ID", "Name", "Session Name", "Type", "Status", "Marked At"}, 0);
     private final AttendanceService attendanceService = new AttendanceService();
     private final JLabel rowCountLabel = new JLabel("0 rows");
     private final JLabel thresholdLabel = new JLabel("⚠ 0 students below 75% attendance");
@@ -28,6 +28,7 @@ public class AttendanceReportPanel extends JPanel {
     private final JTextField searchField = new JTextField(18);
 
     private JTable table;
+    private Timer autoRefreshTimer;
 
     public AttendanceReportPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -37,6 +38,8 @@ public class AttendanceReportPanel extends JPanel {
         table = new JTable(model);
         UiStyle.styleTable(table);
         table.setDefaultRenderer(Object.class, new ThresholdRenderer());
+        table.getColumnModel().getColumn(0).setMinWidth(0);
+        table.getColumnModel().getColumn(0).setMaxWidth(0);
 
         add(UiStyle.wrapScroll(table, Constants.BG), BorderLayout.CENTER);
 
@@ -69,8 +72,25 @@ public class AttendanceReportPanel extends JPanel {
 
         add(top, BorderLayout.NORTH);
         add(bottom, BorderLayout.SOUTH);
+
         loadAttendanceData();
-        new Timer(3000, e -> loadAttendanceData()).start();
+
+        autoRefreshTimer = new Timer(5000, e -> loadAttendanceData());
+        autoRefreshTimer.start();
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        if (autoRefreshTimer != null && !autoRefreshTimer.isRunning()) {
+            autoRefreshTimer.start();
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (autoRefreshTimer != null) autoRefreshTimer.stop();
     }
 
     private String extractQuery(JTextField searchField) {
@@ -104,19 +124,17 @@ public class AttendanceReportPanel extends JPanel {
             protected void done() {
                 try {
                     List<Object[]> rows = get();
-                    SwingUtilities.invokeLater(() -> {
-                        model.setRowCount(0);
-                        belowThresholdUserIds.clear();
-                        for (Object[] row : rows) {
-                            model.addRow(row);
-                        }
-                        model.fireTableDataChanged();
-                        computeThresholds();
-                        rowCountLabel.setText(model.getRowCount() + " rows");
-                        thresholdLabel.setText("⚠ " + belowThresholdUserIds.size() + " students below 75% attendance");
-                        thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
-                        table.repaint();
-                    });
+                    model.setRowCount(0);
+                    belowThresholdUserIds.clear();
+                    for (Object[] row : rows) {
+                        model.addRow(row);
+                    }
+                    model.fireTableDataChanged();
+                    computeThresholds();
+                    rowCountLabel.setText(model.getRowCount() + " rows");
+                    thresholdLabel.setText("⚠ " + belowThresholdUserIds.size() + " students below 75% attendance");
+                    thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
+                    table.repaint();
                 } catch (Exception e) {
                     e.printStackTrace();
                     ToastNotification.showError(AttendanceReportPanel.this,

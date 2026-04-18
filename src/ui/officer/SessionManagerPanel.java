@@ -39,6 +39,7 @@ public class SessionManagerPanel extends JPanel {
 
     private JTable table;
     private DefaultTableModel model;
+    private Timer autoRefreshTimer;
 
     public SessionManagerPanel(User user) {
         this.user = user;
@@ -62,6 +63,23 @@ public class SessionManagerPanel extends JPanel {
         add(container, BorderLayout.CENTER);
 
         loadSessions();
+
+        autoRefreshTimer = new Timer(5000, e -> loadSessions());
+        autoRefreshTimer.start();
+    }
+
+    @Override
+    public void addNotify() {
+        super.addNotify();
+        if (autoRefreshTimer != null && !autoRefreshTimer.isRunning()) {
+            autoRefreshTimer.start();
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        super.removeNotify();
+        if (autoRefreshTimer != null) autoRefreshTimer.stop();
     }
 
     private JPanel buildForm() {
@@ -329,6 +347,12 @@ public class SessionManagerPanel extends JPanel {
             button.setForeground(Constants.TEXT);
             UiStyle.installButtonEffects(button, Constants.RED);
             button.addActionListener(e -> {
+                int confirm = JOptionPane.showConfirmDialog(
+                        SessionManagerPanel.this,
+                        "Close this session? Attendees will no longer be able to mark attendance.",
+                        "Confirm Close",
+                        JOptionPane.YES_NO_OPTION);
+                if (confirm != JOptionPane.YES_OPTION) return;
                 fireEditingStopped();
                 closeSession(sessionId);
             });
