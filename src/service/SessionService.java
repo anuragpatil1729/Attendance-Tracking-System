@@ -137,4 +137,38 @@ public class SessionService {
 
         return list;
     }
+
+    public int countActiveUsers() {
+        String sql = "SELECT COUNT(*) FROM users WHERE is_active = 1 AND role = 'attendee'";
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+            return 0;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to count active users", e);
+        }
+    }
+
+    public double getTodayAttendancePercentage() {
+        int activeUsers = countActiveUsers();
+        if (activeUsers == 0) {
+            return 0.0;
+        }
+
+        String sql = "SELECT COUNT(*) FROM attendance WHERE DATE(marked_at) = CURDATE() AND status IN ('Present','Late')";
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            int presentOrLateCount = 0;
+            if (rs.next()) {
+                presentOrLateCount = rs.getInt(1);
+            }
+            return (presentOrLateCount * 100.0) / activeUsers;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to compute today's attendance percentage", e);
+        }
+    }
 }

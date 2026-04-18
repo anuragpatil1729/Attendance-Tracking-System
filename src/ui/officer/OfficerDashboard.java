@@ -15,6 +15,8 @@ public class OfficerDashboard extends JPanel {
 
     private final SessionService sessionService = new SessionService();
     private JLabel openSessionsValue;
+    private JLabel activeUsersValue;
+    private JLabel todayAttendanceValue;
 
     public OfficerDashboard(User user, SyncManager syncManager) {
         setLayout(new BorderLayout(12, 12));
@@ -35,6 +37,8 @@ public class OfficerDashboard extends JPanel {
 
         add(tabs, BorderLayout.CENTER);
         loadOpenSessions();
+        loadActiveUsers();
+        loadTodayAttendancePercentage();
     }
 
     private void applyTabColors(JTabbedPane tabs) {
@@ -49,12 +53,14 @@ public class OfficerDashboard extends JPanel {
         p.setBackground(Constants.BG);
         p.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
-        p.add(statCard("Total Attendees", "See Accounts tab"));
+        activeUsersValue = new JLabel("Loading...");
+        p.add(statCard("Total Attendees", activeUsersValue));
 
         openSessionsValue = new JLabel("Loading...");
         p.add(statCard("Open Sessions", openSessionsValue));
 
-        p.add(statCard("Today's Attendance %", "See Reports tab"));
+        todayAttendanceValue = new JLabel("Loading...");
+        p.add(statCard("Today's Attendance %", todayAttendanceValue));
         p.add(statCard("Pending Syncs", String.valueOf(syncManager.pendingCount())));
 
         return p;
@@ -112,6 +118,64 @@ public class OfficerDashboard extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    private void loadActiveUsers() {
+        new SwingWorker<Integer, Void>() {
+            @Override
+            protected Integer doInBackground() {
+                return sessionService.countActiveUsers();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int target = get();
+                    animateIntegerValue(activeUsersValue, target, false);
+                } catch (Exception e) {
+                    activeUsersValue.setText("Error");
+                }
+            }
+        }.execute();
+    }
+
+    private void loadTodayAttendancePercentage() {
+        new SwingWorker<Double, Void>() {
+            @Override
+            protected Double doInBackground() {
+                return sessionService.getTodayAttendancePercentage();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int target = (int) Math.round(get());
+                    animateIntegerValue(todayAttendanceValue, target, true);
+                } catch (Exception e) {
+                    todayAttendanceValue.setText("Error");
+                }
+            }
+        }.execute();
+    }
+
+    private void animateIntegerValue(JLabel label, int target, boolean asPercent) {
+        int start = 0;
+        int duration = 400;
+        int step = 20;
+        long startTime = System.currentTimeMillis();
+
+        Timer timer = new Timer(step, null);
+        timer.addActionListener(e -> {
+            long elapsed = System.currentTimeMillis() - startTime;
+            float progress = Math.min(1f, elapsed / (float) duration);
+            int currentValue = Math.round(start + (target - start) * progress);
+            label.setText(asPercent ? currentValue + "%" : String.valueOf(currentValue));
+            if (progress >= 1f) {
+                timer.stop();
+            }
+        });
+        timer.setInitialDelay(0);
+        timer.start();
     }
 
     private static class StatCardPanel extends JPanel {

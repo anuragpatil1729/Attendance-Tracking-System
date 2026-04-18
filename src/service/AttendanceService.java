@@ -93,7 +93,8 @@ public class AttendanceService {
     public List<Object[]> getAllRecords() {
         List<Object[]> rows = new ArrayList<>();
         String sql = """
-            SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
+            SELECT a.user_id, u.full_name, s.name AS session_name,
+                   s.session_type, a.status, a.marked_at
             FROM attendance a
             JOIN users u ON u.id = a.user_id
             JOIN sessions s ON s.id = a.session_id
@@ -106,7 +107,7 @@ public class AttendanceService {
                 rows.add(new Object[]{
                         rs.getInt("user_id"),
                         rs.getString("full_name"),
-                        rs.getInt("session_id"),
+                        rs.getString("session_name"),
                         rs.getString("session_type"),
                         rs.getString("status"),
                         rs.getTimestamp("marked_at")
