@@ -7,6 +7,8 @@ import util.Constants;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public class OfficerDashboard extends JPanel {
 
@@ -14,8 +16,9 @@ public class OfficerDashboard extends JPanel {
     private JLabel openSessionsValue;
 
     public OfficerDashboard(User user, SyncManager syncManager) {
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(12, 12));
         setBackground(Constants.BG);
+        setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Overview", statsPanel(syncManager));
@@ -25,17 +28,16 @@ public class OfficerDashboard extends JPanel {
         tabs.addTab("Device Logs", new DeviceLogPanel());
 
         add(tabs, BorderLayout.CENTER);
-
-        loadOpenSessions(); // 🔥 important
+        loadOpenSessions();
     }
 
     private JPanel statsPanel(SyncManager syncManager) {
-        JPanel p = new JPanel(new GridLayout(1, 4, 8, 8));
+        JPanel p = new JPanel(new GridLayout(1, 4, 12, 12));
         p.setBackground(Constants.BG);
+        p.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
 
         p.add(statCard("Total Attendees", "See Accounts tab"));
 
-        // 🔥 dynamic label
         openSessionsValue = new JLabel("Loading...");
         p.add(statCard("Open Sessions", openSessionsValue));
 
@@ -51,23 +53,47 @@ public class OfficerDashboard extends JPanel {
     }
 
     private JPanel statCard(String title, JLabel valueLabel) {
-        JPanel card = new JPanel(new BorderLayout());
+        JPanel card = new JPanel(new BorderLayout(0, 6));
         card.setBackground(Constants.SIDEBAR);
+        card.setBorder(BorderFactory.createEmptyBorder(16, 16, 14, 16));
 
         JLabel t = new JLabel(title);
-        t.setForeground(Constants.ACCENT);
+        t.setForeground(Constants.TEXT);
+        t.setFont(Constants.FONT.deriveFont(Font.PLAIN, 12f));
 
-        valueLabel.setForeground(Constants.TEXT);
-        valueLabel.setFont(Constants.FONT.deriveFont(Font.BOLD, 18f));
+        valueLabel.setForeground(Constants.ACCENT);
+        valueLabel.setFont(Constants.FONT.deriveFont(Font.BOLD, 32f));
+
+        JPanel stripe = new JPanel();
+        stripe.setPreferredSize(new Dimension(0, 5));
+        stripe.setBackground(Constants.ACCENT);
 
         card.add(t, BorderLayout.NORTH);
         card.add(valueLabel, BorderLayout.CENTER);
-        card.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        card.add(stripe, BorderLayout.SOUTH);
 
+        installHoverLift(card);
         return card;
     }
 
-    // 🔥 THIS IS THE REAL FIX
+    private void installHoverLift(JPanel card) {
+        card.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                card.setBorder(BorderFactory.createEmptyBorder(12, 16, 18, 16));
+                card.setBackground(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.08f));
+                card.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                card.setBorder(BorderFactory.createEmptyBorder(16, 16, 14, 16));
+                card.setBackground(Constants.SIDEBAR);
+                card.repaint();
+            }
+        });
+    }
+
     private void loadOpenSessions() {
         new SwingWorker<Integer, Void>() {
             @Override
@@ -78,8 +104,7 @@ public class OfficerDashboard extends JPanel {
             @Override
             protected void done() {
                 try {
-                    int count = get();
-                    openSessionsValue.setText(String.valueOf(count));
+                    openSessionsValue.setText(String.valueOf(get()));
                 } catch (Exception e) {
                     openSessionsValue.setText("Error");
                 }

@@ -1,13 +1,15 @@
 package ui.attendee;
 
 import db.SyncManager;
+import model.AttendanceRecord;
 import model.Session;
 import model.User;
 import service.AttendanceService;
 import service.SessionService;
 import ui.components.CircularProgressBar;
-import ui.components.RoundedBorder;
+import ui.components.PanelHeader;
 import ui.components.ToastNotification;
+import ui.components.UiStyle;
 import util.Constants;
 import util.DeviceFingerprint;
 import util.NetworkUtil;
@@ -24,8 +26,12 @@ public class AttendeeDashboard extends JPanel {
     private final CircularProgressBar progress = new CircularProgressBar();
     private final JLabel summary = new JLabel("Total: 0 • Attended: 0");
     private final JLabel activeSessionLabel = new JLabel("No active session");
-    private final JButton markBtn = new JButton("Mark Attendance");
+    private final JLabel syncIndicator = new JLabel("Sync pending: 0");
+    private final JButton markBtn = UiStyle.createButton("Mark Attendance", Constants.ACCENT, Color.BLACK);
     private final AttendanceHistoryPanel historyPanel = new AttendanceHistoryPanel();
+
+    private Timer pulseTimer;
+    private Timer progressTimer;
 
     public AttendeeDashboard(User user, SyncManager syncManager) {
         this.user = user;
@@ -38,6 +44,7 @@ public class AttendeeDashboard extends JPanel {
         add(center(), BorderLayout.CENTER);
         add(statusBar(), BorderLayout.SOUTH);
 
+        markBtn.addActionListener(e -> markAttendance());
         refreshAll();
     }
 
@@ -56,39 +63,59 @@ public class AttendeeDashboard extends JPanel {
         JPanel p = new JPanel(new GridLayout(1, 2, 14, 14));
         p.setOpaque(false);
 
-        JPanel cardA = card("Attendance");
+        JPanel cardA = stripeCard("Attendance");
         progress.setPreferredSize(new Dimension(160, 160));
         summary.setForeground(Constants.TEXT);
-        cardA.add(progress); cardA.add(summary);
+        summary.setFont(Constants.FONT.deriveFont(Font.BOLD, 14f));
+        cardA.add(progress);
+        cardA.add(Box.createVerticalStrut(8));
+        cardA.add(summary);
 
-        JPanel cardB = card("Active Session");
+        JPanel cardB = stripeCard("Active Session");
         activeSessionLabel.setForeground(Constants.TEXT);
-        markBtn.setBorder(new RoundedBorder(12));
-        markBtn.setBackground(Constants.ACCENT); markBtn.setForeground(Color.BLACK);
-        markBtn.addActionListener(e -> markAttendance());
-        cardB.add(activeSessionLabel); cardB.add(markBtn);
+        activeSessionLabel.setFont(Constants.FONT.deriveFont(Font.PLAIN, 14f));
+        cardB.add(activeSessionLabel);
+        cardB.add(Box.createVerticalStrut(10));
+        cardB.add(markBtn);
 
-        p.add(cardA); p.add(cardB);
+        p.add(cardA);
+        p.add(cardB);
         return p;
     }
 
-    private JPanel card(String title) {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(Constants.SIDEBAR);
-        card.setBorder(BorderFactory.createCompoundBorder(new RoundedBorder(16), BorderFactory.createEmptyBorder(16, 16, 16, 16)));
-        JLabel l = new JLabel(title); l.setForeground(Constants.ACCENT); l.setFont(Constants.FONT.deriveFont(Font.BOLD, 18f));
-        l.setAlignmentX(Component.LEFT_ALIGNMENT);
-        card.add(l); card.add(Box.createVerticalStrut(12));
-        return card;
+    private JPanel stripeCard(String title) {
+        JPanel shell = new JPanel(new BorderLayout());
+        shell.setBackground(Constants.SIDEBAR);
+        shell.setBorder(BorderFactory.createCompoundBorder(
+                UiStyle.roundedBorder(16),
+                BorderFactory.createEmptyBorder(0, 0, 0, 0)));
+
+        JPanel stripe = new JPanel();
+        stripe.setPreferredSize(new Dimension(8, 0));
+        stripe.setBackground(Constants.ACCENT);
+
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+        content.add(PanelHeader.create(title));
+        content.add(Box.createVerticalStrut(8));
+
+        shell.add(stripe, BorderLayout.WEST);
+        shell.add(content, BorderLayout.CENTER);
+        return shell;
     }
 
     private JComponent statusBar() {
-        JPanel bar = new JPanel(new BorderLayout());
+        JPanel bar = new JPanel(new BorderLayout(12, 0));
         bar.setBackground(Constants.SIDEBAR);
-        JLabel s = new JLabel("Sync pending: " + syncManager.pendingCount());
-        s.setForeground(Constants.TEXT);
-        bar.add(s, BorderLayout.WEST);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                UiStyle.roundedBorder(14),
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+
+        syncIndicator.setForeground(Constants.GREEN);
+        syncIndicator.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
+        bar.add(syncIndicator, BorderLayout.WEST);
         bar.add(historyPanel, BorderLayout.CENTER);
         return bar;
     }
@@ -96,44 +123,119 @@ public class AttendeeDashboard extends JPanel {
     private void refreshAll() {
         new SwingWorker<Void, Void>() {
             Session active;
-            List<model.AttendanceRecord> history;
-            @Override protected Void doInBackground() {
+            List<AttendanceRecord> history;
+
+            @Override
+            protected Void doInBackground() {
                 active = sessionService.getActiveSession();
                 history = attendanceService.attendeeHistory(user.getId(), 10);
                 return null;
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 int total = history.size();
                 int attended = (int) history.stream().filter(h -> "Present".equalsIgnoreCase(h.getStatus()) || "Late".equalsIgnoreCase(h.getStatus())).count();
                 int pct = total == 0 ? 0 : (int) ((attended * 100.0) / total);
-                progress.setValue(pct);
+                animateProgressTo(pct);
                 summary.setText("Total: " + total + " • Attended: " + attended);
                 if (active == null) {
                     activeSessionLabel.setText("No active session");
-                    markBtn.setEnabled(false);
+                    setMarkButtonEnabled(false);
                 } else if ("lecture".equalsIgnoreCase(active.getSessionType())) {
                     activeSessionLabel.setText(active.getName() + " (Lecture - self marking disabled)");
-                    markBtn.setEnabled(false);
+                    setMarkButtonEnabled(false);
                 } else {
                     activeSessionLabel.setText(active.getName() + " • " + active.getSubject());
-                    markBtn.setEnabled(true);
+                    setMarkButtonEnabled(true);
                 }
+
+                int pending = syncManager.pendingCount();
+                syncIndicator.setText("Sync pending: " + pending);
+                syncIndicator.setForeground(pending == 0 ? Constants.GREEN : Constants.ORANGE);
                 historyPanel.setRecords(history);
             }
         }.execute();
     }
 
+    private void animateProgressTo(int target) {
+        if (progressTimer != null) {
+            progressTimer.stop();
+        }
+        int start = progress.getValue();
+        int durationMs = 600;
+        int stepMs = 30;
+        int steps = durationMs / stepMs;
+        final int[] currentStep = {0};
+        progressTimer = new Timer(stepMs, e -> {
+            currentStep[0]++;
+            float t = Math.min(1f, currentStep[0] / (float) steps);
+            int value = start + Math.round((target - start) * t);
+            progress.setValue(value);
+            if (t >= 1f) {
+                progressTimer.stop();
+            }
+        });
+        progressTimer.start();
+    }
+
+    private void setMarkButtonEnabled(boolean enabled) {
+        markBtn.setEnabled(enabled);
+        if (enabled) {
+            startPulse();
+        } else {
+            stopPulse();
+        }
+    }
+
+    private void startPulse() {
+        if (pulseTimer != null && pulseTimer.isRunning()) {
+            return;
+        }
+        final float[] ratio = {0f};
+        final boolean[] up = {true};
+        pulseTimer = new Timer(55, e -> {
+            ratio[0] += up[0] ? 0.08f : -0.08f;
+            if (ratio[0] >= 1f) {
+                ratio[0] = 1f;
+                up[0] = false;
+            } else if (ratio[0] <= 0f) {
+                ratio[0] = 0f;
+                up[0] = true;
+            }
+            markBtn.setBackground(Constants.blend(Constants.ACCENT, Constants.brighten(Constants.ACCENT, 0.28f), ratio[0]));
+        });
+        pulseTimer.start();
+    }
+
+    private void stopPulse() {
+        if (pulseTimer != null) {
+            pulseTimer.stop();
+        }
+        markBtn.setBackground(Constants.ACCENT);
+    }
+
     private void markAttendance() {
         new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() {
+            @Override
+            protected Void doInBackground() {
                 Session active = sessionService.getActiveSession();
-                if (active == null) throw new RuntimeException("No open session");
+                if (active == null) {
+                    throw new RuntimeException("No open session");
+                }
                 attendanceService.markAttendance(user.getId(), active, NetworkUtil.detectIpAddress(), DeviceFingerprint.generate(), "Present", "Self marked");
                 return null;
             }
-            @Override protected void done() {
-                try { get(); ToastNotification.showSuccess(AttendeeDashboard.this, "Attendance marked 🎉"); refreshAll(); }
-                catch (Exception ex) { ToastNotification.showError(AttendeeDashboard.this, ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage()); }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    ToastNotification.showSuccess(AttendeeDashboard.this, "Attendance marked 🎉");
+                    refreshAll();
+                } catch (Exception ex) {
+                    ToastNotification.showError(AttendeeDashboard.this, ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+                }
             }
         }.execute();
     }
