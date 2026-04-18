@@ -153,8 +153,8 @@ public class SessionService {
     }
 
     public double getTodayAttendancePercentage() {
-        String sql = "SELECT COUNT(DISTINCT CASE WHEN status IN ('Present', 'Late') THEN user_id END) * 100.0 / NULLIF(COUNT(DISTINCT user_id), 0) " +
-                "FROM attendance WHERE DATE(marked_at) = CURDATE()";
+        String sql = "SELECT COUNT(DISTINCT CASE WHEN a.status = 'Present' THEN s.id END) * 100.0 / NULLIF(COUNT(DISTINCT s.id), 0) " +
+                "FROM sessions s LEFT JOIN attendance a ON s.id = a.session_id WHERE s.is_open = 1 AND DATE(s.open_time) = CURDATE()";
 
         try (Connection conn = ConnectionPool.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
