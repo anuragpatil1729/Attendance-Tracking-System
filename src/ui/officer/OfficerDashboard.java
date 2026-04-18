@@ -40,7 +40,7 @@ public class OfficerDashboard extends JPanel {
     private void applyTabColors(JTabbedPane tabs) {
         int selected = tabs.getSelectedIndex();
         for (int i = 0; i < tabs.getTabCount(); i++) {
-            tabs.setForegroundAt(i, i == selected ? Color.BLACK : Constants.TEXT);
+            tabs.setForegroundAt(i, i == selected ? Color.BLACK : Constants.darken(Constants.TEXT, 0.15f));
         }
     }
 
@@ -151,12 +151,14 @@ public class OfficerDashboard extends JPanel {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Shape roundRect = new java.awt.geom.RoundRectangle2D.Float(
+                    0, 0, getWidth(), getHeight(), 18, 18);
+            g2.setClip(roundRect);
             g2.setColor(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.10f));
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
-            g2.setClip(new java.awt.geom.RoundRectangle2D.Float(
-                    0, 0, getWidth(), getHeight(), 18, 18));
+            g2.setClip(null);
             g2.setColor(Constants.ACCENT);
-            g2.fillRect(0, 0, 3, getHeight());
+            g2.fillRect(0, 0, 4, getHeight());
             g2.dispose();
             super.paintComponent(g);
         }

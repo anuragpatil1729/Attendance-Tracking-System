@@ -47,6 +47,8 @@ public final class ToastNotification {
             };
             dot.setOpaque(false);
             dot.setPreferredSize(new Dimension(10, 10));
+            dot.setMinimumSize(new Dimension(10, 10));
+            dot.setMaximumSize(new Dimension(10, 10));
             JPanel dotWrap = new JPanel(new GridBagLayout());
             dotWrap.setOpaque(false);
             dotWrap.add(dot);
@@ -106,12 +108,19 @@ public final class ToastNotification {
         if (owner != null && owner.isShowing()) {
             Point p = owner.getLocationOnScreen();
             bounds = new Rectangle(p.x, p.y, owner.getWidth(), owner.getHeight());
+            int x = bounds.x + bounds.width - toast.getWidth() - 18;
+            int y = bounds.y + bounds.height - toast.getHeight() - 18;
+            toast.setLocation(x, y);
         } else {
-            bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
+            GraphicsConfiguration gc = GraphicsEnvironment
+                    .getLocalGraphicsEnvironment()
+                    .getDefaultScreenDevice()
+                    .getDefaultConfiguration();
+            Rectangle screen = gc.getBounds();
+            Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(gc);
+            int x = screen.x + screen.width - toast.getWidth() - 18;
+            int y = screen.y + screen.height - insets.bottom - toast.getHeight() - 18;
+            toast.setLocation(x, y);
         }
-
-        int x = bounds.x + bounds.width - toast.getWidth() - 18;
-        int y = bounds.y + bounds.height - toast.getHeight() - 18;
-        toast.setLocation(x, y);
     }
 }

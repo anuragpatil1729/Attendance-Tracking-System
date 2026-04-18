@@ -33,6 +33,7 @@ public class SessionManagerPanel extends JPanel {
     private final JRadioButton openNow = new JRadioButton("Open Now", true);
     private final JRadioButton schedule = new JRadioButton("Schedule");
     private final JSpinner scheduleDateTime = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.MINUTE));
+    private final JPanel scheduleDateTimeWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 
     private final JLabel openBanner = new JLabel("0 sessions open");
 
@@ -72,7 +73,10 @@ public class SessionManagerPanel extends JPanel {
         JSpinner.DateEditor editor = new JSpinner.DateEditor(scheduleDateTime, "yyyy-MM-dd HH:mm");
         scheduleDateTime.setEditor(editor);
         UiStyle.styleComponent(scheduleDateTime, 10);
-        scheduleDateTime.setVisible(false);
+        scheduleDateTime.setPreferredSize(new Dimension(160, 30));
+        scheduleDateTimeWrap.setOpaque(false);
+        scheduleDateTimeWrap.add(scheduleDateTime);
+        scheduleDateTimeWrap.setVisible(false);
 
         ButtonGroup g = new ButtonGroup();
         g.add(practical);
@@ -90,8 +94,8 @@ public class SessionManagerPanel extends JPanel {
         openNow.setForeground(Constants.TEXT);
         schedule.setForeground(Constants.TEXT);
 
-        schedule.addActionListener(e -> scheduleDateTime.setVisible(true));
-        openNow.addActionListener(e -> scheduleDateTime.setVisible(false));
+        schedule.addActionListener(e -> scheduleDateTimeWrap.setVisible(true));
+        openNow.addActionListener(e -> scheduleDateTimeWrap.setVisible(false));
 
         JButton create = UiStyle.createButton("Create Session", Constants.ACCENT, Color.BLACK);
         create.addActionListener(e -> createSession());
@@ -113,7 +117,7 @@ public class SessionManagerPanel extends JPanel {
         openModes.setOpaque(false);
         openModes.add(openNow);
         openModes.add(schedule);
-        openModes.add(scheduleDateTime);
+        openModes.add(scheduleDateTimeWrap);
         card.add(openModes);
 
         card.add(label("Lock Duration (min)"));
@@ -296,9 +300,14 @@ public class SessionManagerPanel extends JPanel {
             g2.setColor(getBackground());
             g2.fillRect(0, 0, getWidth(), getHeight());
             g2.setColor(Constants.RED);
-            g2.fillRoundRect(0, 2, getWidth() - 1, getHeight() - 4, 12, 12);
+            g2.fillRoundRect(2, 2, getWidth() - 4, getHeight() - 4, 10, 10);
+            g2.setColor(Constants.TEXT);
+            g2.setFont(getFont());
+            FontMetrics fm = g2.getFontMetrics();
+            int tx = (getWidth() - fm.stringWidth(getText())) / 2;
+            int ty = (getHeight() + fm.getAscent() - fm.getDescent()) / 2;
+            g2.drawString(getText(), tx, ty);
             g2.dispose();
-            super.paintComponent(g);
         }
 
         @Override
