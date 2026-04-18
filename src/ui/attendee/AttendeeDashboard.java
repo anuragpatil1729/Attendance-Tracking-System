@@ -2,10 +2,8 @@ package ui.attendee;
 
 import db.SyncManager;
 import model.AttendanceRecord;
-import model.Session;
 import model.User;
 import service.AttendanceService;
-import service.SessionService;
 import ui.components.CircularProgressBar;
 import ui.components.PanelHeader;
 import ui.components.ToastNotification;
@@ -21,17 +19,14 @@ import java.util.List;
 public class AttendeeDashboard extends JPanel {
     private final User user;
     private final AttendanceService attendanceService = new AttendanceService();
-    private final SessionService sessionService = new SessionService();
     private final SyncManager syncManager;
     private final CircularProgressBar progress = new CircularProgressBar();
     private final JLabel summary = new JLabel("Total: 0 • Attended: 0");
-    private final JLabel activeSessionLabel = new JLabel("No active session");
     private final JLabel syncIndicator = new JLabel("Sync pending: 0");
     private final StatusDot syncDot = new StatusDot();
-    private final JButton markBtn = UiStyle.createButton("Mark Attendance", Constants.ACCENT, Color.BLACK);
     private final AttendanceHistoryPanel historyPanel = new AttendanceHistoryPanel();
+    private final JPanel sessionsContainer = new JPanel();
 
-    private Timer pulseTimer;
     private Timer progressTimer;
 
     public AttendeeDashboard(User user, SyncManager syncManager) {
@@ -45,7 +40,6 @@ public class AttendeeDashboard extends JPanel {
         add(center(), BorderLayout.CENTER);
         add(statusBar(), BorderLayout.SOUTH);
 
-        markBtn.addActionListener(e -> markAttendance());
         refreshAll();
     }
 
@@ -73,13 +67,14 @@ public class AttendeeDashboard extends JPanel {
         cardAContent.add(Box.createVerticalStrut(8));
         cardAContent.add(summary);
 
-        JPanel cardB = stripeCard("Active Session");
-        activeSessionLabel.setForeground(Constants.TEXT);
-        activeSessionLabel.setFont(Constants.FONT.deriveFont(Font.PLAIN, 14f));
+        JPanel cardB = stripeCard("Open Sessions");
+        sessionsContainer.setOpaque(false);
+        sessionsContainer.setLayout(new BoxLayout(sessionsContainer, BoxLayout.Y_AXIS));
+        JScrollPane sessionsScroll = UiStyle.wrapScroll(sessionsContainer, Constants.SIDEBAR);
+        sessionsScroll.setBorder(BorderFactory.createEmptyBorder());
+        sessionsScroll.setPreferredSize(new Dimension(520, 300));
         JPanel cardBContent = cardContent(cardB);
-        cardBContent.add(activeSessionLabel);
-        cardBContent.add(Box.createVerticalStrut(10));
-        cardBContent.add(markBtn);
+        cardBContent.add(sessionsScroll);
 
         p.add(cardA);
         p.add(cardB);
@@ -135,33 +130,24 @@ public class AttendeeDashboard extends JPanel {
 
     private void refreshAll() {
         new SwingWorker<Void, Void>() {
-            Session active;
+            List<AttendanceService.SessionAttendanceView> sessions;
             List<AttendanceRecord> history;
+            AttendanceService.AttendanceStats stats;
 
             @Override
             protected Void doInBackground() {
-                active = sessionService.getActiveSession();
+                sessions = attendanceService.getOpenSessionsForAttendee(user.getId());
                 history = attendanceService.attendeeHistory(user.getId(), 10);
+                stats = attendanceService.getTodayAttendanceStats(user.getId());
                 return null;
             }
 
             @Override
             protected void done() {
-                int total = history.size();
-                int attended = (int) history.stream().filter(h -> "Present".equalsIgnoreCase(h.getStatus()) || "Late".equalsIgnoreCase(h.getStatus())).count();
-                int pct = total == 0 ? 0 : (int) ((attended * 100.0) / total);
+                int pct = stats.getPercentage();
                 animateProgressTo(pct);
-                summary.setText("Total: " + total + " • Attended: " + attended);
-                if (active == null) {
-                    activeSessionLabel.setText("No active session");
-                    setMarkButtonEnabled(false);
-                } else if ("lecture".equalsIgnoreCase(active.getSessionType())) {
-                    activeSessionLabel.setText(active.getName() + " (Lecture - self marking disabled)");
-                    setMarkButtonEnabled(false);
-                } else {
-                    activeSessionLabel.setText(active.getName() + " • " + active.getSubject());
-                    setMarkButtonEnabled(true);
-                }
+                summary.setText("Total: " + stats.getTotal() + " • Attended: " + stats.getAttended());
+                updateSessionRows(sessions);
 
                 int pending = syncManager.pendingCount();
                 syncIndicator.setText("Sync pending: " + pending);
@@ -170,6 +156,67 @@ public class AttendeeDashboard extends JPanel {
                 historyPanel.setRecords(history);
             }
         }.execute();
+    }
+
+    private void updateSessionRows(List<AttendanceService.SessionAttendanceView> sessions) {
+        sessionsContainer.removeAll();
+        if (sessions.isEmpty()) {
+            JLabel none = new JLabel("No open sessions");
+            none.setForeground(Constants.TEXT);
+            sessionsContainer.add(none);
+        }
+
+        for (AttendanceService.SessionAttendanceView row : sessions) {
+            sessionsContainer.add(buildSessionRow(row));
+            sessionsContainer.add(Box.createVerticalStrut(8));
+        }
+
+        sessionsContainer.revalidate();
+        sessionsContainer.repaint();
+    }
+
+    private JComponent buildSessionRow(AttendanceService.SessionAttendanceView row) {
+        JPanel line = UiStyle.sectionCard(new BorderLayout(8, 8), 10);
+        line.setBackground(Constants.INPUT);
+
+        JLabel text = new JLabel(row.getSession().getName() + " • " + row.getSession().getSubject() + " (" + row.getSession().getSessionType() + ")");
+        text.setForeground(Constants.TEXT);
+        text.setFont(Constants.FONT.deriveFont(Font.PLAIN, 13f));
+
+        JComponent action = sessionActionComponent(row);
+
+        line.add(text, BorderLayout.CENTER);
+        line.add(action, BorderLayout.EAST);
+        return line;
+    }
+
+    private JComponent sessionActionComponent(AttendanceService.SessionAttendanceView row) {
+        String status = row.getStatus();
+        if (status == null) {
+            JButton markBtn = UiStyle.createButton("Mark Attendance", Constants.ACCENT, Color.BLACK);
+            markBtn.addActionListener(e -> markAttendance(row));
+            return markBtn;
+        }
+
+        String labelText;
+        Color bg;
+        if ("Present".equalsIgnoreCase(status)) {
+            labelText = "Marked Present";
+            bg = Constants.GREEN;
+        } else if ("Late".equalsIgnoreCase(status)) {
+            labelText = "Marked Late";
+            bg = Constants.ORANGE;
+        } else {
+            labelText = "Marked " + status;
+            bg = Constants.INPUT;
+        }
+
+        JLabel badge = new JLabel(labelText);
+        badge.setOpaque(true);
+        badge.setBackground(bg);
+        badge.setForeground(Color.BLACK);
+        badge.setBorder(BorderFactory.createCompoundBorder(UiStyle.roundedBorder(8), BorderFactory.createEmptyBorder(6, 10, 6, 10)));
+        return badge;
     }
 
     private void animateProgressTo(int target) {
@@ -193,51 +240,18 @@ public class AttendeeDashboard extends JPanel {
         progressTimer.start();
     }
 
-    private void setMarkButtonEnabled(boolean enabled) {
-        markBtn.setEnabled(enabled);
-        if (enabled) {
-            startPulse();
-        } else {
-            stopPulse();
-        }
-    }
-
-    private void startPulse() {
-        if (pulseTimer != null && pulseTimer.isRunning()) {
-            return;
-        }
-        final float[] ratio = {0f};
-        final boolean[] up = {true};
-        pulseTimer = new Timer(55, e -> {
-            ratio[0] += up[0] ? 0.08f : -0.08f;
-            if (ratio[0] >= 1f) {
-                ratio[0] = 1f;
-                up[0] = false;
-            } else if (ratio[0] <= 0f) {
-                ratio[0] = 0f;
-                up[0] = true;
-            }
-            markBtn.setBackground(Constants.blend(Constants.ACCENT, Constants.brighten(Constants.ACCENT, 0.28f), ratio[0]));
-        });
-        pulseTimer.start();
-    }
-
-    private void stopPulse() {
-        if (pulseTimer != null) {
-            pulseTimer.stop();
-        }
-        markBtn.setBackground(Constants.ACCENT);
-    }
-
-    private void markAttendance() {
+    private void markAttendance(AttendanceService.SessionAttendanceView row) {
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() {
-                Session active = sessionService.getActiveSession();
-                if (active == null) {
-                    throw new RuntimeException("No open session");
-                }
-                attendanceService.markAttendance(user.getId(), active, NetworkUtil.detectIpAddress(), DeviceFingerprint.generate(), "Present", "Self marked");
+                attendanceService.markAttendance(
+                        user.getId(),
+                        row.getSession(),
+                        NetworkUtil.detectIpAddress(),
+                        DeviceFingerprint.generate(),
+                        "Present",
+                        "Self marked"
+                );
                 return null;
             }
 
@@ -248,7 +262,8 @@ public class AttendeeDashboard extends JPanel {
                     ToastNotification.showSuccess(AttendeeDashboard.this, "Attendance marked 🎉");
                     refreshAll();
                 } catch (Exception ex) {
-                    ToastNotification.showError(AttendeeDashboard.this, ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+                    Throwable cause = ex.getCause() == null ? ex : ex.getCause();
+                    ToastNotification.showError(AttendeeDashboard.this, cause.getMessage());
                 }
             }
         }.execute();
