@@ -28,21 +28,20 @@ public class OfficerDashboard extends JPanel {
         tabs.addTab("Attendance Reports", new AttendanceReportPanel());
         tabs.addTab("Accounts", new AccountManagerPanel());
         tabs.addTab("Device Logs", new DeviceLogPanel());
+        applyTabColors(tabs);
         tabs.addChangeListener(e -> {
-            int i = tabs.getSelectedIndex();
-            if (i >= 0) {
-                tabs.setForegroundAt(i, Color.BLACK);
-                for (int t = 0; t < tabs.getTabCount(); t++) {
-                    if (t != i) {
-                        tabs.setForegroundAt(t, Constants.TEXT);
-                    }
-                }
-            }
+            applyTabColors(tabs);
         });
-        tabs.setForegroundAt(0, Color.BLACK);
 
         add(tabs, BorderLayout.CENTER);
         loadOpenSessions();
+    }
+
+    private void applyTabColors(JTabbedPane tabs) {
+        int selected = tabs.getSelectedIndex();
+        for (int i = 0; i < tabs.getTabCount(); i++) {
+            tabs.setForegroundAt(i, i == selected ? Color.BLACK : Constants.TEXT);
+        }
     }
 
     private JPanel statsPanel(SyncManager syncManager) {
@@ -155,7 +154,7 @@ public class OfficerDashboard extends JPanel {
             g2.setColor(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.10f));
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
             g2.setColor(Constants.ACCENT);
-            g2.fillRoundRect(0, 0, 3, getHeight(), 18, 18);
+            g2.fillRect(0, 0, 3, getHeight());
             g2.dispose();
             super.paintComponent(g);
         }

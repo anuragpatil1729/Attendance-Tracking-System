@@ -11,6 +11,8 @@ import util.NetworkUtil;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.prefs.Preferences;
 
 public class LoginFrame extends JFrame {
@@ -34,6 +36,14 @@ public class LoginFrame extends JFrame {
         setLocationRelativeTo(null);
         getContentPane().setBackground(Constants.BG);
         add(buildCard());
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+                if (card != null) {
+                    card.startGlow();
+                }
+            }
+        });
         loadRemembered();
     }
 
@@ -45,7 +55,6 @@ public class LoginFrame extends JFrame {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setPreferredSize(new Dimension(400, 360));
         card.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
-        card.startGlow();
 
         JLabel logo = new JLabel("🐾 Smart Attendance", SwingConstants.CENTER);
         logo.setFont(Constants.FONT.deriveFont(Font.BOLD, 24f));

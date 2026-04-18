@@ -4,6 +4,7 @@ import util.Constants;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.Point2D;
 
 public class CircularProgressBar extends JComponent {
     private int value;
@@ -42,11 +43,19 @@ public class CircularProgressBar extends JComponent {
 
         int sweep = Math.round((value / 100f) * 360f);
         if (sweep > 0) {
-            for (int i = 0; i < sweep; i++) {
-                float ratio = sweep == 1 ? 1f : i / (float) (sweep - 1);
-                g2.setColor(Constants.blend(Constants.ACCENT, Constants.GREEN, ratio));
-                g2.drawArc(x, y, size, size, 90 - i, -1);
-            }
+            float cx = x + size / 2f;
+            float cy = y + size / 2f;
+            float radius = size / 2f;
+            RadialGradientPaint arcPaint = new RadialGradientPaint(
+                    new Point2D.Float(cx, cy),
+                    radius,
+                    new float[]{0f, 1f},
+                    new Color[]{
+                            Constants.brighten(Constants.ACCENT, 0.20f),
+                            Constants.GREEN
+                    });
+            g2.setPaint(arcPaint);
+            g2.drawArc(x, y, size, size, 90, -sweep);
         }
 
         String text = value + "%";
