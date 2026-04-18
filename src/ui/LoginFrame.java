@@ -72,7 +72,7 @@ public class LoginFrame extends JFrame {
         remember.setOpaque(false);
         remember.setForeground(Constants.TEXT);
 
-        JButton toggle = UiStyle.createButton("Show/Hide", Constants.INPUT, Constants.TEXT);
+        JButton toggle = UiStyle.createButton("Show/Hide", Constants.SIDEBAR, Constants.TEXT);
         toggle.addActionListener(e -> password.setEchoChar(password.getEchoChar() == 0 ? '•' : (char) 0));
 
         loginBtn = UiStyle.createButton("Login", Constants.ACCENT, Color.BLACK);

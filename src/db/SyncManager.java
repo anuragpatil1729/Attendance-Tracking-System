@@ -2,7 +2,6 @@ package db;
 
 import ui.components.ToastNotification;
 
-import javax.swing.*;
 import java.sql.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -63,7 +62,7 @@ public class SyncManager {
                 markSynced(local, localId);
             }
         } catch (Exception e) {
-            SwingUtilities.invokeLater(() -> ToastNotification.showError(null, "Sync failed: " + e.getMessage()));
+            ToastNotification.showError(null, "Sync failed: " + e.getMessage());
         }
     }
 

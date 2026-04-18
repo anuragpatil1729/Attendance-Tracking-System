@@ -119,9 +119,7 @@ public class AttendeeDashboard extends JPanel {
     private JComponent statusBar() {
         JPanel bar = new JPanel(new BorderLayout(12, 0));
         bar.setBackground(Constants.SIDEBAR);
-        bar.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(14),
-                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+        bar.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
