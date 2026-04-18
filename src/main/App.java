@@ -40,6 +40,10 @@ public class App {
         UIManager.put("TabbedPane.foreground", Constants.TEXT);
         UIManager.put("TabbedPane.selected", Constants.ACCENT);
         UIManager.put("ScrollPane.background", Constants.BG);
+        UIManager.put("ScrollBar.thumb", Constants.blend(Constants.INPUT, Constants.TEXT, 0.20f));
+        UIManager.put("ScrollBar.track", Constants.SIDEBAR);
+        UIManager.put("ScrollBar.thumbHighlight", Constants.blend(Constants.ACCENT, Constants.TEXT, 0.15f));
+        UIManager.put("ScrollBar.width", 10);
         UIManager.put("OptionPane.background", Constants.SIDEBAR);
         UIManager.put("OptionPane.messageForeground", Constants.TEXT);
     }

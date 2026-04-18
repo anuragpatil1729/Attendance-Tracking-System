@@ -23,6 +23,7 @@ public class MainFrame extends JFrame {
         super(Constants.APP_NAME + " • " + user.getRole());
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setSize(1200, 760);
+        setMinimumSize(new Dimension(900, 600));
         setLocationRelativeTo(null);
         getContentPane().setBackground(Constants.BG);
         setLayout(new BorderLayout());

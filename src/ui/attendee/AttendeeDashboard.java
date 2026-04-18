@@ -120,7 +120,7 @@ public class AttendeeDashboard extends JPanel {
         JPanel bar = new JPanel(new BorderLayout(12, 0));
         bar.setBackground(Constants.SIDEBAR);
         bar.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.sectionBorder(14),
+                UiStyle.roundedBorder(14),
                 BorderFactory.createEmptyBorder(12, 12, 12, 12)));
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));

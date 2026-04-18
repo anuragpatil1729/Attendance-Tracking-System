@@ -85,8 +85,14 @@ public class AccountManagerPanel extends JPanel {
         fields.add(pwd);
         fields.add(add);
 
+        JPanel fieldsWrap = new JPanel(new BorderLayout());
+        fieldsWrap.setOpaque(false);
+        fieldsWrap.setPreferredSize(new Dimension(0, 44));
+        fieldsWrap.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
+        fieldsWrap.add(fields, BorderLayout.CENTER);
+
         card.add(title, BorderLayout.NORTH);
-        card.add(fields, BorderLayout.CENTER);
+        card.add(fieldsWrap, BorderLayout.CENTER);
         return card;
     }
 

@@ -286,6 +286,8 @@ public class SessionManagerPanel extends JPanel {
         protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(getBackground());
+            g2.fillRect(0, 0, getWidth(), getHeight());
             g2.setColor(Constants.RED);
             g2.fillRoundRect(0, 2, getWidth() - 1, getHeight() - 4, 12, 12);
             g2.dispose();
@@ -294,6 +296,7 @@ public class SessionManagerPanel extends JPanel {
 
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            setBackground(isSelected ? table.getSelectionBackground() : (row % 2 == 0 ? Constants.INPUT : Constants.SIDEBAR));
             return this;
         }
     }

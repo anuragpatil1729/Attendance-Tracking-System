@@ -47,12 +47,15 @@ public final class ToastNotification {
             };
             dot.setOpaque(false);
             dot.setPreferredSize(new Dimension(10, 10));
+            JPanel dotWrap = new JPanel(new GridBagLayout());
+            dotWrap.setOpaque(false);
+            dotWrap.add(dot);
 
             JLabel label = new JLabel(message);
             label.setForeground(textColor);
             label.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
 
-            panel.add(dot, BorderLayout.WEST);
+            panel.add(dotWrap, BorderLayout.WEST);
             panel.add(label, BorderLayout.CENTER);
 
             toast.setContentPane(panel);
