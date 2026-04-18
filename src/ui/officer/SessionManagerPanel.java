@@ -161,26 +161,32 @@ public class SessionManagerPanel extends JPanel {
     }
 
     private void createSession() {
+        final boolean openNowSelected = openNow.isSelected();
+        final String sessionName = name.getText().trim();
+        final String subjectName = subject.getText().trim();
+        final String sessionType = practical.isSelected() ? "practical" : "lecture";
+        final Integer lockDuration = (Integer) lockSpinner.getValue();
+        final Date selectedDateTime = (Date) scheduleDateTime.getValue();
+
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() {
-                if (openNow.isSelected()) {
+                if (openNowSelected) {
                     sessionService.createAndOpen(
-                            name.getText().trim(),
-                            subject.getText().trim(),
-                            practical.isSelected() ? "practical" : "lecture",
+                            sessionName,
+                            subjectName,
+                            sessionType,
                             user.getId(),
-                            (Integer) lockSpinner.getValue(),
+                            lockDuration,
                             LocalDateTime.now());
                 } else {
-                    Date selected = (Date) scheduleDateTime.getValue();
-                    LocalDateTime when = LocalDateTime.ofInstant(Instant.ofEpochMilli(selected.getTime()), ZoneId.systemDefault());
+                    LocalDateTime when = LocalDateTime.ofInstant(Instant.ofEpochMilli(selectedDateTime.getTime()), ZoneId.systemDefault());
                     sessionService.schedule(
-                            name.getText().trim(),
-                            subject.getText().trim(),
-                            practical.isSelected() ? "practical" : "lecture",
+                            sessionName,
+                            subjectName,
+                            sessionType,
                             user.getId(),
-                            (Integer) lockSpinner.getValue(),
+                            lockDuration,
                             when);
                 }
                 return null;
@@ -191,7 +197,7 @@ public class SessionManagerPanel extends JPanel {
                 try {
                     get();
                     ToastNotification.showSuccess(SessionManagerPanel.this,
-                            openNow.isSelected() ? "Session opened 🚀" : "Session scheduled ⏱");
+                            openNowSelected ? "Session opened 🚀" : "Session scheduled ⏱");
                     loadSessions();
                     name.setText("");
                     subject.setText("");

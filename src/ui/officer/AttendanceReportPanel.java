@@ -57,6 +57,7 @@ public class AttendanceReportPanel extends JPanel {
         rowCountLabel.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
         thresholdLabel.setForeground(Constants.ORANGE);
         thresholdLabel.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
+        thresholdLabel.setVisible(false);
 
         top.add(search);
         top.add(refresh);
@@ -116,6 +117,7 @@ public class AttendanceReportPanel extends JPanel {
                     computeThresholds();
                     rowCountLabel.setText(model.getRowCount() + " rows");
                     thresholdLabel.setText("⚠ " + belowThresholdUserIds.size() + " students below 75% attendance");
+                    thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
                     table.repaint();
                 } catch (Exception e) {
                     ToastNotification.showError(AttendanceReportPanel.this, e.getMessage());

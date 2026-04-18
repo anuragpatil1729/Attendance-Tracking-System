@@ -153,6 +153,8 @@ public class OfficerDashboard extends JPanel {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.10f));
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
+            g2.setClip(new java.awt.geom.RoundRectangle2D.Float(
+                    0, 0, getWidth(), getHeight(), 18, 18));
             g2.setColor(Constants.ACCENT);
             g2.fillRect(0, 0, 3, getHeight());
             g2.dispose();
