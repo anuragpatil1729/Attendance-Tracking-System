@@ -17,4 +17,23 @@ public final class Constants {
 
     private Constants() {
     }
+
+    public static Color blend(Color c1, Color c2, float ratio) {
+        float r = Math.max(0f, Math.min(1f, ratio));
+        float ir = 1f - r;
+        return new Color(
+                Math.min(255, Math.round(c1.getRed() * ir + c2.getRed() * r)),
+                Math.min(255, Math.round(c1.getGreen() * ir + c2.getGreen() * r)),
+                Math.min(255, Math.round(c1.getBlue() * ir + c2.getBlue() * r))
+        );
+    }
+
+    public static Color brighten(Color color, float factor) {
+        float f = Math.max(0f, factor);
+        return new Color(
+                Math.min(255, (int) (color.getRed() + (255 - color.getRed()) * f)),
+                Math.min(255, (int) (color.getGreen() + (255 - color.getGreen()) * f)),
+                Math.min(255, (int) (color.getBlue() + (255 - color.getBlue()) * f))
+        );
+    }
 }

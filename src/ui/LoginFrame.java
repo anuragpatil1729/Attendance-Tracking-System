@@ -2,15 +2,17 @@ package ui;
 
 import model.User;
 import service.AuthService;
-import ui.components.RoundedBorder;
 import ui.components.ShakeAnimation;
 import ui.components.StatusBadge;
 import ui.components.ToastNotification;
+import ui.components.UiStyle;
 import util.Constants;
 import util.NetworkUtil;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.prefs.Preferences;
 
 public class LoginFrame extends JFrame {
@@ -20,11 +22,17 @@ public class LoginFrame extends JFrame {
     private final JCheckBox remember = new JCheckBox("Remember Me");
     private final AuthService authService = new AuthService();
     private final Preferences preferences = Preferences.userRoot().node("attendance-app");
+    private final JLabel spinner = new JLabel("◐", SwingConstants.CENTER);
+
+    private GlowCard card;
+    private JButton loginBtn;
+    private Timer spinnerTimer;
+    private int spinnerIndex;
 
     public LoginFrame() {
         super(Constants.APP_NAME);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setSize(520, 420);
+        setSize(520, 430);
         setLocationRelativeTo(null);
         getContentPane().setBackground(Constants.BG);
         add(buildCard());
@@ -35,79 +43,89 @@ public class LoginFrame extends JFrame {
         JPanel wrap = new JPanel(new GridBagLayout());
         wrap.setOpaque(false);
 
-        JPanel card = new JPanel();
+        card = new GlowCard();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setBackground(Constants.SIDEBAR);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(20),
-                BorderFactory.createEmptyBorder(20, 24, 20, 24)));
-        card.setPreferredSize(new Dimension(380, 300));
+        card.setPreferredSize(new Dimension(380, 320));
+        card.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
 
         JLabel logo = new JLabel("🐾 Smart Attendance", SwingConstants.CENTER);
         logo.setFont(Constants.FONT.deriveFont(Font.BOLD, 24f));
         logo.setForeground(Constants.ACCENT);
+        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         StatusBadge badge = new StatusBadge(
                 NetworkUtil.isOnline() ? "Online" : "Offline",
                 NetworkUtil.isOnline());
         badge.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        styleField(username, "Username");
-        styleField(password, "Password");
+        UiStyle.styleField(username, "Username");
+        UiStyle.styleField(password, "Password");
 
         remember.setOpaque(false);
         remember.setForeground(Constants.TEXT);
 
-        JButton toggle = button("Show/Hide");
+        JButton toggle = UiStyle.createButton("Show/Hide", Constants.INPUT, Constants.TEXT);
         toggle.addActionListener(e -> password.setEchoChar(password.getEchoChar() == 0 ? '•' : (char) 0));
 
-        JButton loginBtn = button("Login");
-        loginBtn.addActionListener(e -> login(card));
+        loginBtn = UiStyle.createButton("Login", Constants.ACCENT, Color.BLACK);
+        Color normalAccent = Constants.ACCENT;
+        Color hoverAccent = Constants.brighten(Constants.ACCENT, 0.12f);
+        loginBtn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (loginBtn.isEnabled()) {
+                    loginBtn.setBackground(hoverAccent);
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                loginBtn.setBackground(normalAccent);
+            }
+        });
+        loginBtn.addActionListener(e -> login());
+
+        spinner.setFont(Constants.FONT.deriveFont(Font.BOLD, 16f));
+        spinner.setForeground(Constants.ACCENT);
+        spinner.setAlignmentX(Component.CENTER_ALIGNMENT);
+        spinner.setVisible(false);
 
         card.add(logo);
         card.add(Box.createVerticalStrut(8));
         card.add(badge);
         card.add(Box.createVerticalStrut(14));
-
         card.add(username);
         card.add(Box.createVerticalStrut(8));
-
         card.add(password);
         card.add(Box.createVerticalStrut(8));
-
         card.add(toggle);
         card.add(Box.createVerticalStrut(6));
-
         card.add(remember);
         card.add(Box.createVerticalStrut(14));
-
         card.add(loginBtn);
+        card.add(Box.createVerticalStrut(10));
+        card.add(spinner);
 
         wrap.add(card);
         return wrap;
     }
 
-    private void login(JPanel card) {
+    private void login() {
+        setLoading(true);
         new SwingWorker<User, Void>() {
-
             @Override
             protected User doInBackground() {
-
-                // ✅ FIXED HERE (trim added)
-                return authService.login(
-                        username.getText().trim(),
-                        new String(password.getPassword()).trim());
+                return authService.login(username.getText().trim(), new String(password.getPassword()).trim());
             }
 
             @Override
             protected void done() {
+                setLoading(false);
                 try {
                     User user = get();
-
                     if (user == null) {
                         ShakeAnimation.shake(card);
-                        ToastNotification.showError(LoginFrame.this,
-                                "Wrong credentials. Try again ✨");
+                        ToastNotification.showError(LoginFrame.this, "Wrong credentials. Try again ✨");
                         return;
                     }
 
@@ -119,7 +137,6 @@ public class LoginFrame extends JFrame {
 
                     new MainFrame(user).setVisible(true);
                     dispose();
-
                 } catch (Exception ex) {
                     ToastNotification.showError(LoginFrame.this, ex.getMessage());
                 }
@@ -127,25 +144,98 @@ public class LoginFrame extends JFrame {
         }.execute();
     }
 
-    private void styleField(JTextField field, String tip) {
-        field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        field.setBorder(new RoundedBorder(10));
-        field.setBackground(Constants.INPUT);
-        field.setForeground(Constants.TEXT);
-        field.setCaretColor(Constants.ACCENT);
-        field.setToolTipText(tip);
+    private void setLoading(boolean loading) {
+        loginBtn.setEnabled(!loading);
+        spinner.setVisible(loading);
+        if (loading) {
+            startSpinner();
+            card.startGlow();
+        } else {
+            stopSpinner();
+            card.stopGlow();
+        }
     }
 
-    private JButton button(String text) {
-        JButton b = new JButton(text);
-        b.setFocusPainted(false);
-        b.setBackground(Constants.INPUT);
-        b.setForeground(Constants.TEXT);
-        b.setBorder(new RoundedBorder(10));
-        return b;
+    private void startSpinner() {
+        if (spinnerTimer != null && spinnerTimer.isRunning()) {
+            return;
+        }
+        final String[] states = {"◐", "◓", "◑", "◒"};
+        spinnerTimer = new Timer(100, e -> {
+            spinner.setText(states[spinnerIndex % states.length] + " Signing in...");
+            spinnerIndex++;
+        });
+        spinnerTimer.start();
+    }
+
+    private void stopSpinner() {
+        if (spinnerTimer != null) {
+            spinnerTimer.stop();
+        }
+        spinner.setText("◐");
+        spinnerIndex = 0;
     }
 
     private void loadRemembered() {
         username.setText(preferences.get("username", ""));
+    }
+
+    private static final class GlowCard extends JPanel {
+        private Color glowColor = Constants.ACCENT;
+        private Timer glowTimer;
+        private float ratio = 0f;
+        private boolean increasing = true;
+
+        private GlowCard() {
+            setOpaque(false);
+        }
+
+        private void startGlow() {
+            if (glowTimer != null && glowTimer.isRunning()) {
+                return;
+            }
+            glowTimer = new Timer(45, e -> {
+                ratio += increasing ? 0.06f : -0.06f;
+                if (ratio >= 1f) {
+                    ratio = 1f;
+                    increasing = false;
+                }
+                if (ratio <= 0f) {
+                    ratio = 0f;
+                    increasing = true;
+                }
+                glowColor = Constants.blend(Constants.ACCENT, Constants.brighten(Constants.ACCENT, 0.3f), ratio);
+                repaint();
+            });
+            glowTimer.start();
+        }
+
+        private void stopGlow() {
+            if (glowTimer != null) {
+                glowTimer.stop();
+            }
+            glowColor = Constants.ACCENT;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Constants.SIDEBAR);
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+            g2.dispose();
+            super.paintComponent(g);
+        }
+
+        @Override
+        protected void paintBorder(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(glowColor);
+            g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20);
+            g2.dispose();
+        }
     }
 }
