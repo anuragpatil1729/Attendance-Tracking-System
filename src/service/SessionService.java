@@ -1,23 +1,25 @@
 package service;
 
-import db.CloudDBConnection;
+import db.ConnectionPool;
 import model.Session;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SessionService {
 
-    // ✅ Create + Open Session
     public void createAndOpen(String name, String subject, String type,
-            int userId, int lockDuration, LocalDateTime time) {
+                              int userId, int lockDuration, LocalDateTime time) {
 
         String sql = "INSERT INTO sessions (name, subject, session_type, opened_by, open_time, lock_duration_minutes, is_open) VALUES (?, ?, ?, ?, ?, ?, 1)";
 
-        try (Connection conn = CloudDBConnection.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, name);
             ps.setString(2, subject);
@@ -33,12 +35,39 @@ public class SessionService {
         }
     }
 
+    public void schedule(String name, String subject, String type,
+                         int userId, int lockDuration, LocalDateTime openTime) {
+        String sql = "INSERT INTO sessions (name, subject, session_type, opened_by, open_time, lock_duration_minutes, is_open) VALUES (?, ?, ?, ?, ?, ?, 0)";
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, name);
+            ps.setString(2, subject);
+            ps.setString(3, type);
+            ps.setInt(4, userId);
+            ps.setTimestamp(5, Timestamp.valueOf(openTime));
+            ps.setInt(6, lockDuration);
+            ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to schedule session", e);
+        }
+    }
+
+    public int activateScheduled() {
+        String sql = "UPDATE sessions SET is_open=1 WHERE is_open=0 AND open_time <= NOW()";
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            return ps.executeUpdate();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to activate scheduled sessions", e);
+        }
+    }
+
     public Session getActiveSession() {
         String sql = "SELECT id, name, subject, session_type, lock_duration_minutes, open_time FROM sessions WHERE is_open = 1 LIMIT 1";
 
-        try (Connection conn = CloudDBConnection.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql);
-                ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
             if (rs.next()) {
                 Session s = new Session();
@@ -66,8 +95,8 @@ public class SessionService {
     public void closeSession(int sessionId) {
         String sql = "UPDATE sessions SET is_open=0, close_time=NOW() WHERE id=?";
 
-        try (Connection conn = CloudDBConnection.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, sessionId);
             ps.executeUpdate();
@@ -77,15 +106,14 @@ public class SessionService {
         }
     }
 
-    // 🔥 FETCH OPEN SESSIONS (THIS FIXES YOUR UI)
     public List<Session> getOpenSessions() {
         List<Session> list = new ArrayList<>();
 
         String sql = "SELECT id, name, subject, session_type, lock_duration_minutes, open_time FROM sessions WHERE is_open = 1";
 
-        try (Connection conn = CloudDBConnection.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql);
-                ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 Session s = new Session();

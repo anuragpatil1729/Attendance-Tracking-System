@@ -1,6 +1,6 @@
 package ui.officer;
 
-import db.CloudDBConnection;
+import db.ConnectionPool;
 import ui.components.ToastNotification;
 import ui.components.UiStyle;
 import util.Constants;
@@ -8,7 +8,6 @@ import util.Constants;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -26,20 +25,16 @@ public class DeviceLogPanel extends JPanel {
         JTable table = new JTable(model);
         UiStyle.styleTable(table);
         table.setDefaultRenderer(Object.class, new LogRenderer());
-        JTableHeader header = table.getTableHeader();
-        header.setBackground(Constants.blend(Constants.ACCENT, Constants.SIDEBAR, 0.35f));
-        header.setForeground(Constants.TEXT);
 
         add(UiStyle.wrapScroll(table, Constants.BG), BorderLayout.CENTER);
 
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        top.setOpaque(false);
+        JPanel top = UiStyle.sectionCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 14);
         JButton refresh = UiStyle.createButton("Refresh", Constants.INPUT, Constants.TEXT);
         refresh.addActionListener(e -> load());
 
         blockedBadge.setOpaque(true);
         blockedBadge.setBackground(Constants.RED);
-        blockedBadge.setForeground(Color.BLACK);
+        blockedBadge.setForeground(Constants.TEXT);
         blockedBadge.setBorder(BorderFactory.createCompoundBorder(
                 UiStyle.roundedBorder(10),
                 BorderFactory.createEmptyBorder(6, 10, 6, 10)));
@@ -57,7 +52,7 @@ public class DeviceLogPanel extends JPanel {
             @Override
             protected Object[][] doInBackground() {
                 java.util.List<Object[]> rows = new java.util.ArrayList<>();
-                try (Connection c = CloudDBConnection.getConnection();
+                try (Connection c = ConnectionPool.getConnection();
                      PreparedStatement ps = c.prepareStatement("SELECT user_id, ip_address, device_fingerprint, login_time, attempt_status FROM device_log ORDER BY id DESC LIMIT 500");
                      ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {

@@ -11,11 +11,13 @@ import util.Constants;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
 import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 
 public class SessionManagerPanel extends JPanel {
@@ -28,6 +30,9 @@ public class SessionManagerPanel extends JPanel {
     private final JSpinner lockSpinner = new JSpinner(new SpinnerNumberModel(10, 1, 240, 1));
     private final JRadioButton practical = new JRadioButton("Practical", true);
     private final JRadioButton lecture = new JRadioButton("Lecture");
+    private final JRadioButton openNow = new JRadioButton("Open Now", true);
+    private final JRadioButton schedule = new JRadioButton("Schedule");
+    private final JSpinner scheduleDateTime = new JSpinner(new SpinnerDateModel(new Date(), null, null, java.util.Calendar.MINUTE));
 
     private final JLabel openBanner = new JLabel("0 sessions open");
 
@@ -59,15 +64,15 @@ public class SessionManagerPanel extends JPanel {
     }
 
     private JPanel buildForm() {
-        JPanel card = new JPanel(new GridLayout(0, 2, 8, 8));
-        card.setBackground(Constants.SIDEBAR);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(16),
-                BorderFactory.createEmptyBorder(14, 14, 14, 14)));
+        JPanel card = UiStyle.sectionCard(new GridLayout(0, 2, 8, 8), 16);
 
         UiStyle.styleField(name, "Session name");
         UiStyle.styleField(subject, "Subject");
         UiStyle.styleComponent(lockSpinner, 10);
+        JSpinner.DateEditor editor = new JSpinner.DateEditor(scheduleDateTime, "yyyy-MM-dd HH:mm");
+        scheduleDateTime.setEditor(editor);
+        UiStyle.styleComponent(scheduleDateTime, 10);
+        scheduleDateTime.setVisible(false);
 
         ButtonGroup g = new ButtonGroup();
         g.add(practical);
@@ -77,7 +82,18 @@ public class SessionManagerPanel extends JPanel {
         practical.setForeground(Constants.TEXT);
         lecture.setForeground(Constants.TEXT);
 
-        JButton create = UiStyle.createButton("Create & Open", Constants.ACCENT, Color.BLACK);
+        ButtonGroup openModeGroup = new ButtonGroup();
+        openModeGroup.add(openNow);
+        openModeGroup.add(schedule);
+        openNow.setOpaque(false);
+        schedule.setOpaque(false);
+        openNow.setForeground(Constants.TEXT);
+        schedule.setForeground(Constants.TEXT);
+
+        schedule.addActionListener(e -> scheduleDateTime.setVisible(true));
+        openNow.addActionListener(e -> scheduleDateTime.setVisible(false));
+
+        JButton create = UiStyle.createButton("Create Session", Constants.ACCENT, Color.BLACK);
         create.addActionListener(e -> createSession());
 
         card.add(label("Session Name"));
@@ -92,6 +108,14 @@ public class SessionManagerPanel extends JPanel {
         radios.add(lecture);
         card.add(radios);
 
+        card.add(label("Open Mode"));
+        JPanel openModes = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        openModes.setOpaque(false);
+        openModes.add(openNow);
+        openModes.add(schedule);
+        openModes.add(scheduleDateTime);
+        card.add(openModes);
+
         card.add(label("Lock Duration (min)"));
         card.add(lockSpinner);
         card.add(new JLabel());
@@ -101,11 +125,8 @@ public class SessionManagerPanel extends JPanel {
     }
 
     private JComponent buildBanner() {
-        JPanel banner = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+        JPanel banner = UiStyle.sectionCard(new FlowLayout(FlowLayout.LEFT, 10, 6), 12);
         banner.setBackground(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.12f));
-        banner.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(12),
-                BorderFactory.createEmptyBorder(4, 10, 4, 10)));
 
         openBanner.setForeground(Constants.TEXT);
         openBanner.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
@@ -128,10 +149,6 @@ public class SessionManagerPanel extends JPanel {
         UiStyle.styleTable(table);
         table.setDefaultRenderer(Object.class, new SessionRenderer());
 
-        JTableHeader header = table.getTableHeader();
-        header.setBackground(Constants.blend(Constants.ACCENT, Constants.SIDEBAR, 0.35f));
-        header.setForeground(Constants.TEXT);
-
         table.getColumnModel().getColumn(4).setCellRenderer(new CloseButtonRenderer());
         table.getColumnModel().getColumn(4).setCellEditor(new CloseButtonEditor());
 
@@ -147,13 +164,25 @@ public class SessionManagerPanel extends JPanel {
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() {
-                sessionService.createAndOpen(
-                        name.getText().trim(),
-                        subject.getText().trim(),
-                        practical.isSelected() ? "practical" : "lecture",
-                        user.getId(),
-                        (Integer) lockSpinner.getValue(),
-                        LocalDateTime.now());
+                if (openNow.isSelected()) {
+                    sessionService.createAndOpen(
+                            name.getText().trim(),
+                            subject.getText().trim(),
+                            practical.isSelected() ? "practical" : "lecture",
+                            user.getId(),
+                            (Integer) lockSpinner.getValue(),
+                            LocalDateTime.now());
+                } else {
+                    Date selected = (Date) scheduleDateTime.getValue();
+                    LocalDateTime when = LocalDateTime.ofInstant(Instant.ofEpochMilli(selected.getTime()), ZoneId.systemDefault());
+                    sessionService.schedule(
+                            name.getText().trim(),
+                            subject.getText().trim(),
+                            practical.isSelected() ? "practical" : "lecture",
+                            user.getId(),
+                            (Integer) lockSpinner.getValue(),
+                            when);
+                }
                 return null;
             }
 
@@ -161,7 +190,8 @@ public class SessionManagerPanel extends JPanel {
             protected void done() {
                 try {
                     get();
-                    ToastNotification.showSuccess(SessionManagerPanel.this, "Session opened 🚀");
+                    ToastNotification.showSuccess(SessionManagerPanel.this,
+                            openNow.isSelected() ? "Session opened 🚀" : "Session scheduled ⏱");
                     loadSessions();
                     name.setText("");
                     subject.setText("");
@@ -245,9 +275,21 @@ public class SessionManagerPanel extends JPanel {
         private CloseButtonRenderer() {
             super("Close");
             setFocusPainted(false);
-            setBorder(UiStyle.roundedBorder(10));
-            setBackground(Constants.RED);
-            setForeground(Color.BLACK);
+            setOpaque(false);
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setForeground(Constants.TEXT);
+            setFont(Constants.FONT.deriveFont(Font.BOLD, 12f));
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(Constants.RED);
+            g2.fillRoundRect(0, 2, getWidth() - 1, getHeight() - 4, 12, 12);
+            g2.dispose();
+            super.paintComponent(g);
         }
 
         @Override
@@ -262,9 +304,11 @@ public class SessionManagerPanel extends JPanel {
 
         private CloseButtonEditor() {
             button.setFocusPainted(false);
+            button.setOpaque(true);
             button.setBorder(UiStyle.roundedBorder(10));
             button.setBackground(Constants.RED);
-            button.setForeground(Color.BLACK);
+            button.setForeground(Constants.TEXT);
+            UiStyle.installButtonEffects(button, Constants.RED);
             button.addActionListener(e -> {
                 fireEditingStopped();
                 closeSession(sessionId);

@@ -35,7 +35,7 @@ public class SyncManager {
         }
 
         try (Connection local = LocalDBConnection.getConnection();
-             Connection cloud = CloudDBConnection.getConnection();
+             Connection cloud = ConnectionPool.getConnection();
              PreparedStatement fetch = local.prepareStatement("SELECT * FROM attendance_local WHERE sync_status='pending'");
              ResultSet rs = fetch.executeQuery()) {
 

@@ -1,6 +1,7 @@
 package service;
 
 import db.CloudDBConnection;
+import db.ConnectionPool;
 import db.LocalDBConnection;
 import model.AttendanceRecord;
 import model.Session;
@@ -33,7 +34,7 @@ public class AttendanceService {
     public List<AttendanceRecord> attendeeHistory(int userId, int limit) {
         List<AttendanceRecord> list = new ArrayList<>();
         String sql = "SELECT * FROM attendance WHERE user_id=? ORDER BY marked_at DESC LIMIT ?";
-        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setInt(2, limit);
             try (ResultSet rs = ps.executeQuery()) {
@@ -57,7 +58,7 @@ public class AttendanceService {
     }
 
     public void upsertLectureAttendance(int officerId, int userId, int sessionId, String status, String remarks, String action, String reason) {
-        try (Connection conn = CloudDBConnection.getConnection(); CallableStatement cs = conn.prepareCall("{CALL sp_lecture_upsert(?,?,?,?,?,?)}")) {
+        try (Connection conn = ConnectionPool.getConnection(); CallableStatement cs = conn.prepareCall("{CALL sp_lecture_upsert(?,?,?,?,?,?)}")) {
             cs.setInt(1, officerId);
             cs.setInt(2, userId);
             cs.setInt(3, sessionId);
@@ -71,7 +72,7 @@ public class AttendanceService {
     }
 
     public void deleteLectureAttendance(int officerId, int userId, int sessionId, String reason) {
-        try (Connection conn = CloudDBConnection.getConnection();
+        try (Connection conn = ConnectionPool.getConnection();
              PreparedStatement del = conn.prepareStatement("DELETE FROM attendance WHERE user_id=? AND session_id=?")) {
             del.setInt(1, userId);
             del.setInt(2, sessionId);
@@ -84,7 +85,7 @@ public class AttendanceService {
 
     private void saveCloud(int userId, int sessionId, String ip, String fingerprint, String status, String remarks, String localId, String syncStatus) {
         String sql = "INSERT INTO attendance(user_id, session_id, status, remarks, marked_at, ip_address, device_fingerprint, sync_status, local_id) VALUES(?,?,?,?,CURRENT_TIMESTAMP,?,?,?,?)";
-        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setInt(2, sessionId);
             ps.setString(3, status);
@@ -117,7 +118,7 @@ public class AttendanceService {
 
     private void logDevice(int userId, String ip, String fingerprint, String status) {
         String sql = "INSERT INTO device_log(user_id, ip_address, device_fingerprint, login_time, attempt_status) VALUES(?,?,?,CURRENT_TIMESTAMP,?)";
-        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
             ps.setString(2, ip);
             ps.setString(3, fingerprint);

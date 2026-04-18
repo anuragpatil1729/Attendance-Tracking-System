@@ -1,19 +1,25 @@
 package ui.officer;
 
-import db.CloudDBConnection;
+import db.ConnectionPool;
 import ui.components.ToastNotification;
 import ui.components.UiStyle;
 import util.Constants;
 import util.PasswordUtil;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLIntegrityConstraintViolationException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AccountManagerPanel extends JPanel {
     private final DefaultTableModel model = new DefaultTableModel(new String[]{"ID", "Username", "Full Name", "Email", "Role", "Active"}, 0);
@@ -31,22 +37,21 @@ public class AccountManagerPanel extends JPanel {
         JTable table = new JTable(model);
         UiStyle.styleTable(table);
         table.setDefaultRenderer(Object.class, new ZebraRenderer());
-        JTableHeader header = table.getTableHeader();
-        header.setBackground(Constants.blend(Constants.ACCENT, Constants.SIDEBAR, 0.35f));
-        header.setForeground(Constants.TEXT);
 
         add(UiStyle.wrapScroll(table, Constants.BG), BorderLayout.CENTER);
 
-        JPanel actions = new JPanel(new BorderLayout());
+        JPanel actions = new JPanel(new BorderLayout(8, 8));
         actions.setOpaque(false);
         actions.add(buildAddCard(), BorderLayout.CENTER);
 
-        JPanel rowActions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        rowActions.setOpaque(false);
+        JPanel rowActions = UiStyle.sectionCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 14);
+        JButton importCsv = UiStyle.createButton("Import CSV", Constants.GREEN, Color.BLACK);
+        importCsv.addActionListener(e -> importCsv());
         JButton deactivate = UiStyle.createButton("Deactivate Selected", Constants.ORANGE, Color.BLACK);
         deactivate.addActionListener(e -> deactivate(table.getSelectedRow() >= 0 ? (Integer) model.getValueAt(table.getSelectedRow(), 0) : -1));
-        JButton reset = UiStyle.createButton("Reset Password", Constants.RED, Color.BLACK);
+        JButton reset = UiStyle.createButton("Reset Password", Constants.RED, Constants.TEXT);
         reset.addActionListener(e -> resetPassword(table.getSelectedRow() >= 0 ? (Integer) model.getValueAt(table.getSelectedRow(), 0) : -1));
+        rowActions.add(importCsv);
         rowActions.add(deactivate);
         rowActions.add(reset);
         actions.add(rowActions, BorderLayout.SOUTH);
@@ -57,11 +62,7 @@ public class AccountManagerPanel extends JPanel {
     }
 
     private JComponent buildAddCard() {
-        JPanel card = new JPanel(new BorderLayout(8, 8));
-        card.setBackground(Constants.SIDEBAR);
-        card.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(14),
-                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+        JPanel card = UiStyle.sectionCard(new BorderLayout(8, 8), 14);
 
         JLabel title = new JLabel("Add New Attendee");
         title.setForeground(Constants.ACCENT);
@@ -114,20 +115,33 @@ public class AccountManagerPanel extends JPanel {
     }
 
     private void loadUsers() {
-        new SwingWorker<Void, Void>() {
+        new SwingWorker<List<Object[]>, Void>() {
             @Override
-            protected Void doInBackground() {
-                model.setRowCount(0);
-                try (Connection c = CloudDBConnection.getConnection();
+            protected List<Object[]> doInBackground() {
+                List<Object[]> rows = new ArrayList<>();
+                try (Connection c = ConnectionPool.getConnection();
                      PreparedStatement ps = c.prepareStatement("SELECT id, username, full_name, email, role, is_active FROM users ORDER BY id DESC");
                      ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        model.addRow(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getBoolean(6)});
+                        rows.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getBoolean(6)});
                     }
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                return null;
+                return rows;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    List<Object[]> rows = get();
+                    model.setRowCount(0);
+                    for (Object[] row : rows) {
+                        model.addRow(row);
+                    }
+                } catch (Exception e) {
+                    ToastNotification.showError(AccountManagerPanel.this, e.getMessage());
+                }
             }
         }.execute();
     }
@@ -138,22 +152,96 @@ public class AccountManagerPanel extends JPanel {
             return;
         }
 
-        try (Connection c = CloudDBConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,password_hash,full_name,email,role,is_active) VALUES(?,?,?,?, 'attendee',1)")) {
-            ps.setString(1, username);
-            ps.setString(2, PasswordUtil.hash(password));
-            ps.setString(3, fullName);
-            ps.setString(4, email);
-            ps.executeUpdate();
-            loadUsers();
-            this.username.setText("");
-            this.fullName.setText("");
-            this.email.setText("");
-            this.pwd.setText("");
-            ToastNotification.showSuccess(this, "Attendee added");
-        } catch (Exception e) {
-            ToastNotification.showError(this, e.getMessage());
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                try (Connection c = ConnectionPool.getConnection();
+                     PreparedStatement ps = c.prepareStatement("INSERT INTO users(username,password_hash,full_name,email,role,is_active) VALUES(?,?,?,?, 'attendee',1)")) {
+                    ps.setString(1, username);
+                    ps.setString(2, PasswordUtil.hash(password));
+                    ps.setString(3, fullName);
+                    ps.setString(4, email);
+                    ps.executeUpdate();
+                    return null;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    AccountManagerPanel.this.username.setText("");
+                    AccountManagerPanel.this.fullName.setText("");
+                    AccountManagerPanel.this.email.setText("");
+                    AccountManagerPanel.this.pwd.setText("");
+                    loadUsers();
+                    ToastNotification.showSuccess(AccountManagerPanel.this, "Attendee added");
+                } catch (Exception e) {
+                    ToastNotification.showError(AccountManagerPanel.this, e.getMessage());
+                }
+            }
+        }.execute();
+    }
+
+    private void importCsv() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Import attendees CSV");
+        chooser.setFileFilter(new FileNameExtensionFilter("CSV files", "csv"));
+        int result = chooser.showOpenDialog(this);
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return;
         }
+        File file = chooser.getSelectedFile();
+
+        new SwingWorker<int[], Void>() {
+            @Override
+            protected int[] doInBackground() {
+                int imported = 0;
+                int duplicates = 0;
+                String sql = "INSERT INTO users(username,password_hash,full_name,email,role,is_active) VALUES(?,?,?,?, 'attendee',1)";
+
+                try (Connection c = ConnectionPool.getConnection();
+                     PreparedStatement ps = c.prepareStatement(sql);
+                     BufferedReader reader = new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.isBlank()) {
+                            continue;
+                        }
+                        String[] cols = line.split(",", -1);
+                        if (cols.length < 4) {
+                            continue;
+                        }
+                        try {
+                            ps.setString(1, cols[0].trim());
+                            ps.setString(2, PasswordUtil.hash(cols[3].trim()));
+                            ps.setString(3, cols[1].trim());
+                            ps.setString(4, cols[2].trim());
+                            ps.executeUpdate();
+                            imported++;
+                        } catch (SQLIntegrityConstraintViolationException dup) {
+                            duplicates++;
+                        }
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                return new int[]{imported, duplicates};
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int[] counts = get();
+                    loadUsers();
+                    ToastNotification.showInfo(AccountManagerPanel.this, "Imported " + counts[0] + ", skipped " + counts[1] + " duplicates");
+                } catch (Exception e) {
+                    ToastNotification.showError(AccountManagerPanel.this, e.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private void deactivate(int id) {
@@ -163,7 +251,8 @@ public class AccountManagerPanel extends JPanel {
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() {
-                try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET is_active=0 WHERE id=?")) {
+                try (Connection c = ConnectionPool.getConnection();
+                     PreparedStatement ps = c.prepareStatement("UPDATE users SET is_active=0 WHERE id=?")) {
                     ps.setInt(1, id);
                     ps.executeUpdate();
                     return null;
@@ -196,7 +285,8 @@ public class AccountManagerPanel extends JPanel {
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() {
-                try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET password_hash=? WHERE id=?")) {
+                try (Connection c = ConnectionPool.getConnection();
+                     PreparedStatement ps = c.prepareStatement("UPDATE users SET password_hash=? WHERE id=?")) {
                     ps.setString(1, PasswordUtil.hash(temp));
                     ps.setInt(2, id);
                     ps.executeUpdate();

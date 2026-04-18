@@ -1,6 +1,6 @@
 package service;
 
-import db.CloudDBConnection;
+import db.ConnectionPool;
 import model.Session;
 
 import java.sql.Connection;
@@ -18,7 +18,7 @@ public class AntiProxyService {
                 ORDER BY marked_at DESC
                 LIMIT 1
                 """;
-        try (Connection conn = CloudDBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = ConnectionPool.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, session.getId());
             ps.setString(2, ip);
             ps.setString(3, fingerprint);

@@ -11,8 +11,6 @@ import util.NetworkUtil;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.prefs.Preferences;
 
 public class LoginFrame extends JFrame {
@@ -32,7 +30,7 @@ public class LoginFrame extends JFrame {
     public LoginFrame() {
         super(Constants.APP_NAME);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        setSize(520, 430);
+        setSize(560, 470);
         setLocationRelativeTo(null);
         getContentPane().setBackground(Constants.BG);
         add(buildCard());
@@ -40,13 +38,14 @@ public class LoginFrame extends JFrame {
     }
 
     private JComponent buildCard() {
-        JPanel wrap = new JPanel(new GridBagLayout());
-        wrap.setOpaque(false);
+        JPanel wrap = new GradientWrapPanel();
+        wrap.setLayout(new GridBagLayout());
 
         card = new GlowCard();
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        card.setPreferredSize(new Dimension(380, 320));
+        card.setPreferredSize(new Dimension(400, 360));
         card.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+        card.startGlow();
 
         JLabel logo = new JLabel("🐾 Smart Attendance", SwingConstants.CENTER);
         logo.setFont(Constants.FONT.deriveFont(Font.BOLD, 24f));
@@ -68,21 +67,6 @@ public class LoginFrame extends JFrame {
         toggle.addActionListener(e -> password.setEchoChar(password.getEchoChar() == 0 ? '•' : (char) 0));
 
         loginBtn = UiStyle.createButton("Login", Constants.ACCENT, Color.BLACK);
-        Color normalAccent = Constants.ACCENT;
-        Color hoverAccent = Constants.brighten(Constants.ACCENT, 0.12f);
-        loginBtn.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                if (loginBtn.isEnabled()) {
-                    loginBtn.setBackground(hoverAccent);
-                }
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                loginBtn.setBackground(normalAccent);
-            }
-        });
         loginBtn.addActionListener(e -> login());
 
         spinner.setFont(Constants.FONT.deriveFont(Font.BOLD, 16f));
@@ -149,10 +133,8 @@ public class LoginFrame extends JFrame {
         spinner.setVisible(loading);
         if (loading) {
             startSpinner();
-            card.startGlow();
         } else {
             stopSpinner();
-            card.stopGlow();
         }
     }
 
@@ -180,6 +162,18 @@ public class LoginFrame extends JFrame {
         username.setText(preferences.get("username", ""));
     }
 
+    private static final class GradientWrapPanel extends JPanel {
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g.create();
+            GradientPaint gp = new GradientPaint(0, 0, Constants.BG, 0, getHeight(), Constants.blend(Constants.BG, Constants.SIDEBAR, 0.3f));
+            g2.setPaint(gp);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.dispose();
+        }
+    }
+
     private static final class GlowCard extends JPanel {
         private Color glowColor = Constants.ACCENT;
         private Timer glowTimer;
@@ -204,18 +198,10 @@ public class LoginFrame extends JFrame {
                     ratio = 0f;
                     increasing = true;
                 }
-                glowColor = Constants.blend(Constants.ACCENT, Constants.brighten(Constants.ACCENT, 0.3f), ratio);
+                glowColor = Constants.blend(Constants.ACCENT, Constants.brighten(Constants.ACCENT, 0.35f), ratio);
                 repaint();
             });
             glowTimer.start();
-        }
-
-        private void stopGlow() {
-            if (glowTimer != null) {
-                glowTimer.stop();
-            }
-            glowColor = Constants.ACCENT;
-            repaint();
         }
 
         @Override
