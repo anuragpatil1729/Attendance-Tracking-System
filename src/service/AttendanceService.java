@@ -90,6 +90,34 @@ public class AttendanceService {
         return list;
     }
 
+    public List<Object[]> getAllRecords() {
+        List<Object[]> rows = new ArrayList<>();
+        String sql = """
+            SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
+            FROM attendance a
+            JOIN users u ON u.id = a.user_id
+            JOIN sessions s ON s.id = a.session_id
+            ORDER BY a.marked_at DESC
+            """;
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                rows.add(new Object[]{
+                        rs.getInt("user_id"),
+                        rs.getString("full_name"),
+                        rs.getInt("session_id"),
+                        rs.getString("session_type"),
+                        rs.getString("status"),
+                        rs.getTimestamp("marked_at")
+                });
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load attendance records", e);
+        }
+        return rows;
+    }
+
     public void upsertLectureAttendance(int officerId, int userId, int sessionId, String status, String remarks, String action, String reason) {
         try (Connection conn = ConnectionPool.getConnection(); CallableStatement cs = conn.prepareCall("{CALL sp_lecture_upsert(?,?,?,?,?,?)}")) {
             cs.setInt(1, officerId);
