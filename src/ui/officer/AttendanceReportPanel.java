@@ -1,18 +1,15 @@
 package ui.officer;
 
-import db.ConnectionPool;
 import ui.components.ToastNotification;
 import ui.components.UiStyle;
 import util.Constants;
+import service.AttendanceService;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.FileWriter;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,9 +21,11 @@ public class AttendanceReportPanel extends JPanel {
     private static final String SEARCH_PLACEHOLDER = "Search attendee name...";
 
     private final DefaultTableModel model = new DefaultTableModel(new String[]{"ID", "Name", "Session", "Type", "Status", "Marked At"}, 0);
+    private final AttendanceService attendanceService = new AttendanceService();
     private final JLabel rowCountLabel = new JLabel("0 rows");
     private final JLabel thresholdLabel = new JLabel("⚠ 0 students below 75% attendance");
     private final Set<Integer> belowThresholdUserIds = new HashSet<>();
+    private final JTextField searchField = new JTextField(18);
 
     private JTable table;
 
@@ -43,12 +42,11 @@ public class AttendanceReportPanel extends JPanel {
 
         JPanel top = UiStyle.sectionCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 14);
 
-        JTextField search = new JTextField(18);
-        UiStyle.styleField(search, "Search");
-        UiStyle.installPlaceholder(search, SEARCH_PLACEHOLDER);
+        UiStyle.styleField(searchField, "Search");
+        UiStyle.installPlaceholder(searchField, SEARCH_PLACEHOLDER);
 
-        JButton refresh = UiStyle.createButton("Filter/Search", Constants.INPUT, Constants.TEXT);
-        refresh.addActionListener(e -> load(extractQuery(search)));
+        JButton refresh = UiStyle.createButton("Refresh", Constants.INPUT, Constants.TEXT);
+        refresh.addActionListener(e -> loadAttendanceData());
 
         JButton export = UiStyle.createButton("Export CSV", Constants.GREEN, Color.BLACK);
         export.addActionListener(e -> exportCsv());
@@ -59,7 +57,7 @@ public class AttendanceReportPanel extends JPanel {
         thresholdLabel.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
         thresholdLabel.setVisible(false);
 
-        top.add(search);
+        top.add(searchField);
         top.add(refresh);
         top.add(export);
         top.add(Box.createHorizontalStrut(8));
@@ -71,47 +69,32 @@ public class AttendanceReportPanel extends JPanel {
 
         add(top, BorderLayout.NORTH);
         add(bottom, BorderLayout.SOUTH);
-        load("");
-        new SwingWorker<Void, Void>() {
-            @Override
-            protected Void doInBackground() {
-                new service.AttendanceService().getAll();
-                return null;
-            }
-        }.execute();
+        loadAttendanceData();
+        new Timer(3000, e -> loadAttendanceData()).start();
     }
 
     private String extractQuery(JTextField searchField) {
         return UiStyle.isShowingPlaceholder(searchField, SEARCH_PLACEHOLDER) ? "" : searchField.getText().trim();
     }
 
-    private void load(String search) {
+    private void loadAttendanceData() {
+        String search = extractQuery(searchField);
         new SwingWorker<List<Object[]>, Void>() {
             @Override
             protected List<Object[]> doInBackground() {
                 try {
-                    String sql = """
-                            SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
-                            FROM attendance a
-                            JOIN users u ON u.id=a.user_id
-                            JOIN sessions s ON s.id=a.session_id
-                            WHERE u.full_name LIKE ?
-                            ORDER BY a.marked_at DESC
-                            """;
-                    List<Object[]> rows = new ArrayList<>();
-                    try (Connection c = ConnectionPool.getConnection();
-                         PreparedStatement ps = c.prepareStatement(sql)) {
-                        System.out.println("[AttendanceReport] Loading with search='" + search + "'");
-                        System.out.println("[AttendanceReport] DB URL: " + c.getMetaData().getURL());
-                        ps.setString(1, "%" + search + "%");
-                        try (ResultSet rs = ps.executeQuery()) {
-                            while (rs.next()) {
-                                rows.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getString(4), rs.getString(5), rs.getTimestamp(6)});
-                            }
+                    List<Object[]> rows = attendanceService.getAllRecords();
+                    if (search.isEmpty()) {
+                        return rows;
+                    }
+                    List<Object[]> filteredRows = new ArrayList<>();
+                    for (Object[] row : rows) {
+                        String name = row[1] == null ? "" : row[1].toString();
+                        if (name.toLowerCase().contains(search.toLowerCase())) {
+                            filteredRows.add(row);
                         }
                     }
-                    System.out.println("[AttendanceReport] Rows fetched: " + rows.size());
-                    return rows;
+                    return filteredRows;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
@@ -121,16 +104,19 @@ public class AttendanceReportPanel extends JPanel {
             protected void done() {
                 try {
                     List<Object[]> rows = get();
-                    model.setRowCount(0);
-                    belowThresholdUserIds.clear();
-                    for (Object[] row : rows) {
-                        model.addRow(row);
-                    }
-                    computeThresholds();
-                    rowCountLabel.setText(model.getRowCount() + " rows");
-                    thresholdLabel.setText("⚠ " + belowThresholdUserIds.size() + " students below 75% attendance");
-                    thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
-                    table.repaint();
+                    SwingUtilities.invokeLater(() -> {
+                        model.setRowCount(0);
+                        belowThresholdUserIds.clear();
+                        for (Object[] row : rows) {
+                            model.addRow(row);
+                        }
+                        model.fireTableDataChanged();
+                        computeThresholds();
+                        rowCountLabel.setText(model.getRowCount() + " rows");
+                        thresholdLabel.setText("⚠ " + belowThresholdUserIds.size() + " students below 75% attendance");
+                        thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
+                        table.repaint();
+                    });
                 } catch (Exception e) {
                     e.printStackTrace();
                     ToastNotification.showError(AttendanceReportPanel.this,
