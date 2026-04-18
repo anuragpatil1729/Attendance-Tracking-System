@@ -69,6 +69,7 @@ public class LoginFrame extends JFrame {
         UiStyle.styleField(username, "Username");
         UiStyle.styleField(password, "Password");
 
+        remember.setBackground(new Color(0, 0, 0, 0));
         remember.setOpaque(false);
         remember.setForeground(Constants.TEXT);
 
