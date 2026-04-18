@@ -153,20 +153,20 @@ public class SessionService {
     }
 
     public double getTodayAttendancePercentage() {
-        int activeUsers = countActiveUsers();
-        if (activeUsers == 0) {
-            return 0.0;
-        }
+        String sql = "SELECT COUNT(DISTINCT CASE WHEN status IN ('Present', 'Late') THEN user_id END) * 100.0 / NULLIF(COUNT(DISTINCT user_id), 0) " +
+                "FROM attendance WHERE DATE(marked_at) = CURDATE()";
 
-        String sql = "SELECT COUNT(*) FROM attendance WHERE DATE(marked_at) = CURDATE() AND status IN ('Present','Late')";
         try (Connection conn = ConnectionPool.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            int presentOrLateCount = 0;
+            double percentage = 0.0;
             if (rs.next()) {
-                presentOrLateCount = rs.getInt(1);
+                percentage = rs.getDouble(1);
+                if (rs.wasNull()) {
+                    percentage = 0.0;
+                }
             }
-            return (presentOrLateCount * 100.0) / activeUsers;
+            return Math.min(percentage, 100.0);
         } catch (Exception e) {
             throw new RuntimeException("Failed to compute today's attendance percentage", e);
         }
