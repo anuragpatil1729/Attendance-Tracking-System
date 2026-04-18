@@ -167,7 +167,8 @@ public class AttendanceReportPanel extends JPanel {
         @Override
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             Component c = super.getTableCellRendererComponent(table, value, isSelected, false, row, column);
-            int userId = (Integer) table.getValueAt(row, 0);
+            Object raw = table.getValueAt(row, 0);
+            int userId = raw instanceof Integer ? (Integer) raw : -1;
             if (!isSelected) {
                 Color base = row % 2 == 0 ? Constants.INPUT : Constants.SIDEBAR;
                 c.setBackground(belowThresholdUserIds.contains(userId) ? Constants.blend(base, Constants.RED, 0.25f) : base);

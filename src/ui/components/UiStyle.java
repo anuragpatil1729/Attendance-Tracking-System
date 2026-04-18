@@ -68,9 +68,7 @@ public final class UiStyle {
         Color hover = Constants.brighten(baseColor, 0.15f);
         Color pressed = Constants.darken(baseColor, 0.10f);
         Border normal = roundedBorder(12);
-        Border hoverBorder = BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Constants.ACCENT, 1, true),
-                BorderFactory.createEmptyBorder(0, 0, 0, 0));
+        Border hoverBorder = new AccentRoundedBorder(12);
 
         button.addMouseListener(new MouseAdapter() {
             @Override
@@ -134,7 +132,7 @@ public final class UiStyle {
 
     public static void styleTableHeader(JTableHeader header) {
         header.setReorderingAllowed(false);
-        header.setBackground(Constants.SIDEBAR);
+        header.setBackground(Constants.blend(Constants.SIDEBAR, Constants.ACCENT, 0.18f));
         header.setForeground(Constants.ACCENT);
         header.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Constants.ACCENT));

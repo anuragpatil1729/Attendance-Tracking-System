@@ -9,6 +9,7 @@ src/ui/components/CircularProgressBar.java
 src/ui/components/StatusBadge.java
 src/ui/components/ShakeAnimation.java
 src/ui/components/RoundedBorder.java
+src/ui/components/AccentRoundedBorder.java
 src/ui/officer/SessionManagerPanel.java
 src/ui/officer/AttendanceReportPanel.java
 src/ui/officer/DeviceLogPanel.java

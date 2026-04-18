@@ -11,6 +11,8 @@ import util.NetworkUtil;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.prefs.Preferences;
@@ -22,12 +24,11 @@ public class LoginFrame extends JFrame {
     private final JCheckBox remember = new JCheckBox("Remember Me");
     private final AuthService authService = new AuthService();
     private final Preferences preferences = Preferences.userRoot().node("attendance-app");
-    private final JLabel spinner = new JLabel("◐", SwingConstants.CENTER);
+    private final ArcSpinner spinner = new ArcSpinner();
 
     private GlowCard card;
     private JButton loginBtn;
-    private Timer spinnerTimer;
-    private int spinnerIndex;
+    private Timer loginHoverTimer;
 
     public LoginFrame() {
         super(Constants.APP_NAME);
@@ -36,6 +37,9 @@ public class LoginFrame extends JFrame {
         setLocationRelativeTo(null);
         getContentPane().setBackground(Constants.BG);
         add(buildCard());
+        if (card != null) {
+            card.startGlow();
+        }
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowOpened(WindowEvent e) {
@@ -76,11 +80,16 @@ public class LoginFrame extends JFrame {
         JButton toggle = UiStyle.createButton("Show/Hide", Constants.SIDEBAR, Constants.TEXT);
         toggle.addActionListener(e -> password.setEchoChar(password.getEchoChar() == 0 ? '•' : (char) 0));
 
-        loginBtn = UiStyle.createButton("Login", Constants.ACCENT, Color.BLACK);
+        loginBtn = new JButton("Login");
+        loginBtn.setFocusPainted(false);
+        loginBtn.setFont(Constants.FONT.deriveFont(Font.BOLD, 14f));
+        loginBtn.setBackground(Constants.ACCENT);
+        loginBtn.setForeground(Color.BLACK);
+        loginBtn.setBorder(UiStyle.roundedBorder(12));
+        loginBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        installLoginHoverEffect();
         loginBtn.addActionListener(e -> login());
 
-        spinner.setFont(Constants.FONT.deriveFont(Font.BOLD, 16f));
-        spinner.setForeground(Constants.ACCENT);
         spinner.setAlignmentX(Component.CENTER_ALIGNMENT);
         spinner.setVisible(false);
 
@@ -142,30 +151,47 @@ public class LoginFrame extends JFrame {
         loginBtn.setEnabled(!loading);
         spinner.setVisible(loading);
         if (loading) {
-            startSpinner();
+            spinner.start();
         } else {
-            stopSpinner();
+            spinner.stop();
         }
     }
 
-    private void startSpinner() {
-        if (spinnerTimer != null && spinnerTimer.isRunning()) {
-            return;
-        }
-        final String[] states = {"◐", "◓", "◑", "◒"};
-        spinnerTimer = new Timer(100, e -> {
-            spinner.setText(states[spinnerIndex % states.length] + " Signing in...");
-            spinnerIndex++;
+    private void installLoginHoverEffect() {
+        Color base = Constants.ACCENT;
+        Color hover = Constants.brighten(Constants.ACCENT, 0.15f);
+        loginBtn.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (loginBtn.isEnabled()) {
+                    animateLoginButton(base, hover);
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                animateLoginButton(loginBtn.getBackground(), base);
+            }
         });
-        spinnerTimer.start();
     }
 
-    private void stopSpinner() {
-        if (spinnerTimer != null) {
-            spinnerTimer.stop();
+    private void animateLoginButton(Color from, Color to) {
+        if (loginHoverTimer != null && loginHoverTimer.isRunning()) {
+            loginHoverTimer.stop();
         }
-        spinner.setText("◐");
-        spinnerIndex = 0;
+        final int duration = 140;
+        final int interval = 14;
+        final int steps = duration / interval;
+        final int[] tick = {0};
+        loginHoverTimer = new Timer(interval, e -> {
+            tick[0]++;
+            float t = Math.min(1f, tick[0] / (float) steps);
+            loginBtn.setBackground(Constants.blend(from, to, t));
+            if (t >= 1f) {
+                loginHoverTimer.stop();
+            }
+        });
+        loginHoverTimer.start();
     }
 
     private void loadRemembered() {
@@ -231,6 +257,45 @@ public class LoginFrame extends JFrame {
             g2.setStroke(new BasicStroke(2f));
             g2.setColor(glowColor);
             g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20);
+            g2.dispose();
+        }
+    }
+
+    private static final class ArcSpinner extends JComponent {
+        private int angle;
+        private final Timer timer;
+
+        private ArcSpinner() {
+            setOpaque(false);
+            setPreferredSize(new Dimension(24, 24));
+            setMinimumSize(new Dimension(24, 24));
+            setMaximumSize(new Dimension(24, 24));
+            timer = new Timer(30, e -> {
+                angle = (angle + 12) % 360;
+                repaint();
+            });
+        }
+
+        private void start() {
+            if (!timer.isRunning()) {
+                timer.start();
+            }
+        }
+
+        private void stop() {
+            timer.stop();
+            angle = 0;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.setColor(Constants.ACCENT);
+            int pad = 2;
+            g2.drawArc(pad, pad, getWidth() - (pad * 2), getHeight() - (pad * 2), angle, 90);
             g2.dispose();
         }
     }
