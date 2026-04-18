@@ -6,10 +6,13 @@ import javax.swing.*;
 import javax.swing.border.Border;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
 import java.awt.event.FocusEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 public final class UiStyle {
     private UiStyle() {
@@ -17,6 +20,21 @@ public final class UiStyle {
 
     public static Border roundedBorder(int radius) {
         return new RoundedBorder(radius);
+    }
+
+    public static Border sectionBorder(int radius) {
+        return BorderFactory.createCompoundBorder(
+                roundedBorder(radius),
+                BorderFactory.createMatteBorder(0, 3, 0, 0, Constants.ACCENT));
+    }
+
+    public static JPanel sectionCard(LayoutManager layout, int radius) {
+        JPanel card = new JPanel(layout);
+        card.setBackground(Constants.SIDEBAR);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                sectionBorder(radius),
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+        return card;
     }
 
     public static void styleField(JTextField field, String tooltip) {
@@ -42,7 +60,52 @@ public final class UiStyle {
         button.setForeground(fg);
         button.setBorder(roundedBorder(12));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        installButtonEffects(button, bg);
         return button;
+    }
+
+    public static void installButtonEffects(AbstractButton button, Color baseColor) {
+        Color hover = Constants.brighten(baseColor, 0.15f);
+        Color pressed = Constants.darken(baseColor, 0.10f);
+        Border normal = roundedBorder(12);
+        Border hoverBorder = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Constants.ACCENT, 1, true),
+                BorderFactory.createEmptyBorder(0, 0, 0, 0));
+
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (!button.isEnabled()) {
+                    return;
+                }
+                button.setBackground(hover);
+                button.setBorder(hoverBorder);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(baseColor);
+                button.setBorder(normal);
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (!button.isEnabled()) {
+                    return;
+                }
+                button.setBackground(pressed);
+                button.setBorder(hoverBorder);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (!button.isEnabled()) {
+                    return;
+                }
+                button.setBackground(button.contains(e.getPoint()) ? hover : baseColor);
+                button.setBorder(button.contains(e.getPoint()) ? hoverBorder : normal);
+            }
+        });
     }
 
     public static JPanel createCardLayout() {
@@ -50,7 +113,7 @@ public final class UiStyle {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         card.setBackground(Constants.SIDEBAR);
         card.setBorder(BorderFactory.createCompoundBorder(
-                roundedBorder(16),
+                sectionBorder(16),
                 BorderFactory.createEmptyBorder(14, 14, 14, 14)));
         return card;
     }
@@ -63,11 +126,62 @@ public final class UiStyle {
         table.setBorder(null);
         table.setBackground(Constants.INPUT);
         table.setForeground(Constants.TEXT);
-        table.setSelectionBackground(Constants.ACCENT.darker());
+        table.setSelectionBackground(Constants.darken(Constants.ACCENT, 0.35f));
         table.setSelectionForeground(Constants.TEXT);
         JTableHeader header = table.getTableHeader();
+        styleTableHeader(header);
+    }
+
+    public static void styleTableHeader(JTableHeader header) {
         header.setReorderingAllowed(false);
-        header.setBorder(null);
+        header.setBackground(Constants.SIDEBAR);
+        header.setForeground(Constants.ACCENT);
+        header.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Constants.ACCENT));
+    }
+
+    public static void styleTabbedPane(JTabbedPane tabs) {
+        tabs.setBackground(Constants.SIDEBAR);
+        tabs.setForeground(Constants.TEXT);
+        tabs.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
+        tabs.setUI(new BasicTabbedPaneUI() {
+            @Override
+            protected void installDefaults() {
+                super.installDefaults();
+                highlight = Constants.ACCENT;
+                lightHighlight = Constants.ACCENT;
+                shadow = Constants.SIDEBAR;
+                darkShadow = Constants.SIDEBAR;
+                focus = Constants.ACCENT;
+            }
+
+            @Override
+            protected void paintTabBackground(Graphics g, int tabPlacement, int tabIndex,
+                                              int x, int y, int w, int h, boolean isSelected) {
+                g.setColor(isSelected ? Constants.ACCENT : Constants.SIDEBAR);
+                g.fillRect(x, y, w, h);
+            }
+
+            @Override
+            protected void paintTabBorder(Graphics g, int tabPlacement, int tabIndex,
+                                          int x, int y, int w, int h, boolean isSelected) {
+                // remove default border
+            }
+
+            @Override
+            protected void paintContentBorder(Graphics g, int tabPlacement, int selectedIndex) {
+                // remove content border
+            }
+
+            @Override
+            protected void paintFocusIndicator(Graphics g, int tabPlacement,
+                                               Rectangle[] rects, int tabIndex,
+                                               Rectangle iconRect, Rectangle textRect,
+                                               boolean isSelected) {
+                // no focus border
+            }
+        });
+        tabs.setOpaque(true);
     }
 
     public static JScrollPane wrapScroll(JComponent content, Color bg) {

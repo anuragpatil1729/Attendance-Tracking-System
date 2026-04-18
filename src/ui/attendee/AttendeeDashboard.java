@@ -27,6 +27,7 @@ public class AttendeeDashboard extends JPanel {
     private final JLabel summary = new JLabel("Total: 0 • Attended: 0");
     private final JLabel activeSessionLabel = new JLabel("No active session");
     private final JLabel syncIndicator = new JLabel("Sync pending: 0");
+    private final StatusDot syncDot = new StatusDot();
     private final JButton markBtn = UiStyle.createButton("Mark Attendance", Constants.ACCENT, Color.BLACK);
     private final AttendanceHistoryPanel historyPanel = new AttendanceHistoryPanel();
 
@@ -64,7 +65,7 @@ public class AttendeeDashboard extends JPanel {
         p.setOpaque(false);
 
         JPanel cardA = stripeCard("Attendance");
-        progress.setPreferredSize(new Dimension(160, 160));
+        progress.setPreferredSize(new Dimension(170, 170));
         summary.setForeground(Constants.TEXT);
         summary.setFont(Constants.FONT.deriveFont(Font.BOLD, 14f));
         JPanel cardAContent = cardContent(cardA);
@@ -88,12 +89,10 @@ public class AttendeeDashboard extends JPanel {
     private JPanel stripeCard(String title) {
         JPanel shell = new JPanel(new BorderLayout());
         shell.setBackground(Constants.SIDEBAR);
-        shell.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(16),
-                BorderFactory.createEmptyBorder(0, 0, 0, 0)));
+        shell.setBorder(UiStyle.roundedBorder(16));
 
         JPanel stripe = new JPanel();
-        stripe.setPreferredSize(new Dimension(8, 0));
+        stripe.setPreferredSize(new Dimension(3, 0));
         stripe.setBackground(Constants.ACCENT);
 
         JPanel content = new JPanel();
@@ -121,12 +120,17 @@ public class AttendeeDashboard extends JPanel {
         JPanel bar = new JPanel(new BorderLayout(12, 0));
         bar.setBackground(Constants.SIDEBAR);
         bar.setBorder(BorderFactory.createCompoundBorder(
-                UiStyle.roundedBorder(14),
+                UiStyle.sectionBorder(14),
                 BorderFactory.createEmptyBorder(12, 12, 12, 12)));
 
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        left.setOpaque(false);
         syncIndicator.setForeground(Constants.GREEN);
         syncIndicator.setFont(Constants.FONT.deriveFont(Font.BOLD, 13f));
-        bar.add(syncIndicator, BorderLayout.WEST);
+        left.add(syncDot);
+        left.add(syncIndicator);
+
+        bar.add(left, BorderLayout.WEST);
         bar.add(historyPanel, BorderLayout.CENTER);
         return bar;
     }
@@ -164,6 +168,7 @@ public class AttendeeDashboard extends JPanel {
                 int pending = syncManager.pendingCount();
                 syncIndicator.setText("Sync pending: " + pending);
                 syncIndicator.setForeground(pending == 0 ? Constants.GREEN : Constants.ORANGE);
+                syncDot.setColor(pending == 0 ? Constants.GREEN : Constants.ORANGE);
                 historyPanel.setRecords(history);
             }
         }.execute();
@@ -249,5 +254,43 @@ public class AttendeeDashboard extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    private static class StatusDot extends JComponent {
+        private Color color = Constants.GREEN;
+        private float alpha = 0.4f;
+        private boolean rising = true;
+
+        private StatusDot() {
+            setOpaque(false);
+            setPreferredSize(new Dimension(10, 10));
+            Timer timer = new Timer(70, e -> {
+                alpha += rising ? 0.06f : -0.06f;
+                if (alpha >= 1f) {
+                    alpha = 1f;
+                    rising = false;
+                } else if (alpha <= 0.4f) {
+                    alpha = 0.4f;
+                    rising = true;
+                }
+                repaint();
+            });
+            timer.start();
+        }
+
+        private void setColor(Color color) {
+            this.color = color;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+            g2.setColor(color);
+            g2.fillOval(0, 0, getWidth() - 1, getHeight() - 1);
+            g2.dispose();
+        }
     }
 }

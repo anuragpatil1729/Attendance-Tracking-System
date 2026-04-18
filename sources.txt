@@ -27,6 +27,7 @@ src/TestHash.java
 src/db/LocalDBConnection.java
 src/db/SyncManager.java
 src/db/CloudDBConnection.java
+src/db/ConnectionPool.java
 src/service/AttendanceService.java
 src/service/SessionService.java
 src/service/AuthService.java

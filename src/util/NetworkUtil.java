@@ -2,6 +2,8 @@ package util;
 
 import db.CloudDBConnection;
 
+import db.ConnectionPool;
+
 import java.net.InetAddress;
 
 public final class NetworkUtil {
