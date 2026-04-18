@@ -72,6 +72,13 @@ public class AttendanceReportPanel extends JPanel {
         add(top, BorderLayout.NORTH);
         add(bottom, BorderLayout.SOUTH);
         load("");
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                new service.AttendanceService().getAll();
+                return null;
+            }
+        }.execute();
     }
 
     private String extractQuery(JTextField searchField) {
@@ -82,27 +89,32 @@ public class AttendanceReportPanel extends JPanel {
         new SwingWorker<List<Object[]>, Void>() {
             @Override
             protected List<Object[]> doInBackground() {
-                String sql = """
-                        SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
-                        FROM attendance a
-                        JOIN users u ON u.id=a.user_id
-                        JOIN sessions s ON s.id=a.session_id
-                        WHERE u.full_name LIKE ?
-                        ORDER BY a.marked_at DESC
-                        """;
-                List<Object[]> rows = new ArrayList<>();
-                try (Connection c = ConnectionPool.getConnection();
-                     PreparedStatement ps = c.prepareStatement(sql)) {
-                    ps.setString(1, "%" + search + "%");
-                    try (ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            rows.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getString(4), rs.getString(5), rs.getTimestamp(6)});
+                try {
+                    String sql = """
+                            SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
+                            FROM attendance a
+                            JOIN users u ON u.id=a.user_id
+                            JOIN sessions s ON s.id=a.session_id
+                            WHERE u.full_name LIKE ?
+                            ORDER BY a.marked_at DESC
+                            """;
+                    List<Object[]> rows = new ArrayList<>();
+                    try (Connection c = ConnectionPool.getConnection();
+                         PreparedStatement ps = c.prepareStatement(sql)) {
+                        System.out.println("[AttendanceReport] Loading with search='" + search + "'");
+                        System.out.println("[AttendanceReport] DB URL: " + c.getMetaData().getURL());
+                        ps.setString(1, "%" + search + "%");
+                        try (ResultSet rs = ps.executeQuery()) {
+                            while (rs.next()) {
+                                rows.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getString(4), rs.getString(5), rs.getTimestamp(6)});
+                            }
                         }
                     }
+                    System.out.println("[AttendanceReport] Rows fetched: " + rows.size());
+                    return rows;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                return rows;
             }
 
             @Override
@@ -120,7 +132,9 @@ public class AttendanceReportPanel extends JPanel {
                     thresholdLabel.setVisible(belowThresholdUserIds.size() > 0);
                     table.repaint();
                 } catch (Exception e) {
-                    ToastNotification.showError(AttendanceReportPanel.this, e.getMessage());
+                    e.printStackTrace();
+                    ToastNotification.showError(AttendanceReportPanel.this,
+                            "Load failed: " + e.getMessage());
                 }
             }
         }.execute();

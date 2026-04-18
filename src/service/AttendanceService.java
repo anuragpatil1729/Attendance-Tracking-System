@@ -57,6 +57,39 @@ public class AttendanceService {
         return list;
     }
 
+
+    public List<AttendanceRecord> getAll() {
+        List<AttendanceRecord> list = new ArrayList<>();
+        String sql = """
+            SELECT a.user_id, u.full_name, a.session_id, s.session_type, a.status, a.marked_at
+            FROM attendance a
+            JOIN users u ON u.id = a.user_id
+            JOIN sessions s ON s.id = a.session_id
+            ORDER BY a.marked_at DESC
+            """;
+        try (Connection conn = ConnectionPool.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            System.out.println("[AttendanceService.getAll] DB URL: "
+                + conn.getMetaData().getURL());
+            while (rs.next()) {
+                AttendanceRecord r = new AttendanceRecord();
+                r.setUserId(rs.getInt("user_id"));
+                r.setSessionId(rs.getInt("session_id"));
+                r.setStatus(rs.getString("status"));
+                Timestamp t = rs.getTimestamp("marked_at");
+                if (t != null) r.setMarkedAt(t.toLocalDateTime());
+                r.setSyncStatus("synced");
+                list.add(r);
+            }
+            System.out.println("[AttendanceService.getAll] Rows: " + list.size());
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("getAll failed", e);
+        }
+        return list;
+    }
+
     public void upsertLectureAttendance(int officerId, int userId, int sessionId, String status, String remarks, String action, String reason) {
         try (Connection conn = ConnectionPool.getConnection(); CallableStatement cs = conn.prepareCall("{CALL sp_lecture_upsert(?,?,?,?,?,?)}")) {
             cs.setInt(1, officerId);
