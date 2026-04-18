@@ -18,6 +18,9 @@ public class AuthService {
                     return null;
                 }
                 String hash = rs.getString("password_hash");
+                if (hash == null || hash.isBlank()) {
+                    return null;
+                }
                 if (!PasswordUtil.verify(password, hash)) {
                     return null;
                 }
