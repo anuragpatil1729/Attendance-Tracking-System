@@ -34,7 +34,7 @@ public class SessionService {
     }
 
     public Session getActiveSession() {
-        String sql = "SELECT * FROM sessions WHERE is_open = 1 LIMIT 1";
+        String sql = "SELECT id, name, subject, session_type, lock_duration_minutes, open_time FROM sessions WHERE is_open = 1 LIMIT 1";
 
         try (Connection conn = CloudDBConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql);
@@ -47,6 +47,11 @@ public class SessionService {
                 s.setName(rs.getString("name"));
                 s.setSubject(rs.getString("subject"));
                 s.setSessionType(rs.getString("session_type"));
+                s.setLockDurationMinutes(rs.getInt("lock_duration_minutes"));
+                Timestamp openTime = rs.getTimestamp("open_time");
+                if (openTime != null) {
+                    s.setOpenTime(openTime.toLocalDateTime());
+                }
 
                 return s;
             }
@@ -76,7 +81,7 @@ public class SessionService {
     public List<Session> getOpenSessions() {
         List<Session> list = new ArrayList<>();
 
-        String sql = "SELECT * FROM sessions WHERE is_open = 1";
+        String sql = "SELECT id, name, subject, session_type, lock_duration_minutes, open_time FROM sessions WHERE is_open = 1";
 
         try (Connection conn = CloudDBConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql);
@@ -89,6 +94,11 @@ public class SessionService {
                 s.setName(rs.getString("name"));
                 s.setSubject(rs.getString("subject"));
                 s.setSessionType(rs.getString("session_type"));
+                s.setLockDurationMinutes(rs.getInt("lock_duration_minutes"));
+                Timestamp openTime = rs.getTimestamp("open_time");
+                if (openTime != null) {
+                    s.setOpenTime(openTime.toLocalDateTime());
+                }
 
                 list.add(s);
             }

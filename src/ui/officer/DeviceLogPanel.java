@@ -51,22 +51,42 @@ public class DeviceLogPanel extends JPanel {
     }
 
     private void load() {
-        model.setRowCount(0);
-        int blockedCount = 0;
-        try (Connection c = CloudDBConnection.getConnection();
-             PreparedStatement ps = c.prepareStatement("SELECT user_id, ip_address, device_fingerprint, login_time, attempt_status FROM device_log ORDER BY id DESC LIMIT 500");
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                String status = rs.getString(5);
-                if ("blocked".equalsIgnoreCase(status)) {
-                    blockedCount++;
+        new SwingWorker<Object[][], Void>() {
+            private int blockedCount;
+
+            @Override
+            protected Object[][] doInBackground() {
+                java.util.List<Object[]> rows = new java.util.ArrayList<>();
+                try (Connection c = CloudDBConnection.getConnection();
+                     PreparedStatement ps = c.prepareStatement("SELECT user_id, ip_address, device_fingerprint, login_time, attempt_status FROM device_log ORDER BY id DESC LIMIT 500");
+                     ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String status = rs.getString(5);
+                        if ("blocked".equalsIgnoreCase(status)) {
+                            blockedCount++;
+                        }
+                        rows.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getTimestamp(4), status});
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
-                model.addRow(new Object[]{rs.getInt(1), rs.getString(2), rs.getString(3), rs.getTimestamp(4), status});
+                return rows.toArray(new Object[0][]);
             }
-            blockedBadge.setText(blockedCount + " blocked attempts");
-        } catch (Exception e) {
-            ToastNotification.showError(this, e.getMessage());
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    Object[][] rows = get();
+                    model.setRowCount(0);
+                    for (Object[] row : rows) {
+                        model.addRow(row);
+                    }
+                    blockedBadge.setText(blockedCount + " blocked attempts");
+                } catch (Exception e) {
+                    ToastNotification.showError(DeviceLogPanel.this, e.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private static class LogRenderer extends DefaultTableCellRenderer {

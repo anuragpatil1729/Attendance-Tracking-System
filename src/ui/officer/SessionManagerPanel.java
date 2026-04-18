@@ -173,25 +173,54 @@ public class SessionManagerPanel extends JPanel {
     }
 
     private void closeSession(int sessionId) {
-        sessionService.closeSession(sessionId);
-        ToastNotification.showInfo(this, "Session closed");
-        loadSessions();
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                sessionService.closeSession(sessionId);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    ToastNotification.showInfo(SessionManagerPanel.this, "Session closed");
+                    loadSessions();
+                } catch (Exception ex) {
+                    ToastNotification.showError(SessionManagerPanel.this, ex.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private void loadSessions() {
-        model.setRowCount(0);
-        List<Session> sessions = sessionService.getOpenSessions();
-        openBanner.setText(sessions.size() + " sessions open");
+        new SwingWorker<List<Session>, Void>() {
+            @Override
+            protected List<Session> doInBackground() {
+                return sessionService.getOpenSessions();
+            }
 
-        for (Session s : sessions) {
-            model.addRow(new Object[]{
-                    s.getId(),
-                    s.getName(),
-                    s.getSubject(),
-                    s.getSessionType(),
-                    "Close"
-            });
-        }
+            @Override
+            protected void done() {
+                try {
+                    List<Session> sessions = get();
+                    model.setRowCount(0);
+                    openBanner.setText(sessions.size() + " sessions open");
+
+                    for (Session s : sessions) {
+                        model.addRow(new Object[]{
+                                s.getId(),
+                                s.getName(),
+                                s.getSubject(),
+                                s.getSessionType(),
+                                "Close"
+                        });
+                    }
+                } catch (Exception ex) {
+                    ToastNotification.showError(SessionManagerPanel.this, ex.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private JLabel label(String text) {
