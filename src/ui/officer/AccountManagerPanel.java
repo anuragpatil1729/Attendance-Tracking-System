@@ -160,14 +160,29 @@ public class AccountManagerPanel extends JPanel {
         if (id < 0) {
             return;
         }
-        try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET is_active=0 WHERE id=?")) {
-            ps.setInt(1, id);
-            ps.executeUpdate();
-            loadUsers();
-            ToastNotification.showInfo(this, "User deactivated");
-        } catch (Exception e) {
-            ToastNotification.showError(this, e.getMessage());
-        }
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET is_active=0 WHERE id=?")) {
+                    ps.setInt(1, id);
+                    ps.executeUpdate();
+                    return null;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    loadUsers();
+                    ToastNotification.showInfo(AccountManagerPanel.this, "User deactivated");
+                } catch (Exception e) {
+                    ToastNotification.showError(AccountManagerPanel.this, e.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private void resetPassword(int id) {
@@ -178,14 +193,29 @@ public class AccountManagerPanel extends JPanel {
         if (temp == null || temp.isBlank()) {
             return;
         }
-        try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET password_hash=? WHERE id=?")) {
-            ps.setString(1, PasswordUtil.hash(temp));
-            ps.setInt(2, id);
-            ps.executeUpdate();
-            ToastNotification.showSuccess(this, "Password reset");
-        } catch (Exception e) {
-            ToastNotification.showError(this, e.getMessage());
-        }
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() {
+                try (Connection c = CloudDBConnection.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE users SET password_hash=? WHERE id=?")) {
+                    ps.setString(1, PasswordUtil.hash(temp));
+                    ps.setInt(2, id);
+                    ps.executeUpdate();
+                    return null;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    ToastNotification.showSuccess(AccountManagerPanel.this, "Password reset");
+                } catch (Exception e) {
+                    ToastNotification.showError(AccountManagerPanel.this, e.getMessage());
+                }
+            }
+        }.execute();
     }
 
     private static class ZebraRenderer extends DefaultTableCellRenderer {

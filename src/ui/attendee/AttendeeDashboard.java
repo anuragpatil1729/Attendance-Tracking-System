@@ -67,16 +67,18 @@ public class AttendeeDashboard extends JPanel {
         progress.setPreferredSize(new Dimension(160, 160));
         summary.setForeground(Constants.TEXT);
         summary.setFont(Constants.FONT.deriveFont(Font.BOLD, 14f));
-        cardA.add(progress);
-        cardA.add(Box.createVerticalStrut(8));
-        cardA.add(summary);
+        JPanel cardAContent = cardContent(cardA);
+        cardAContent.add(progress);
+        cardAContent.add(Box.createVerticalStrut(8));
+        cardAContent.add(summary);
 
         JPanel cardB = stripeCard("Active Session");
         activeSessionLabel.setForeground(Constants.TEXT);
         activeSessionLabel.setFont(Constants.FONT.deriveFont(Font.PLAIN, 14f));
-        cardB.add(activeSessionLabel);
-        cardB.add(Box.createVerticalStrut(10));
-        cardB.add(markBtn);
+        JPanel cardBContent = cardContent(cardB);
+        cardBContent.add(activeSessionLabel);
+        cardBContent.add(Box.createVerticalStrut(10));
+        cardBContent.add(markBtn);
 
         p.add(cardA);
         p.add(cardB);
@@ -103,7 +105,16 @@ public class AttendeeDashboard extends JPanel {
 
         shell.add(stripe, BorderLayout.WEST);
         shell.add(content, BorderLayout.CENTER);
+        shell.putClientProperty("contentPanel", content);
         return shell;
+    }
+
+    private JPanel cardContent(JPanel card) {
+        Object content = card.getClientProperty("contentPanel");
+        if (content instanceof JPanel panel) {
+            return panel;
+        }
+        return card;
     }
 
     private JComponent statusBar() {

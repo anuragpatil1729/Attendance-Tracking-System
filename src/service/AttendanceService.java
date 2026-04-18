@@ -65,7 +65,6 @@ public class AttendanceService {
             cs.setString(5, remarks);
             cs.setString(6, reason == null ? "manual update" : reason);
             cs.execute();
-            insertAudit(conn, officerId, action, "attendance", sessionId, "", status + " / " + remarks, reason);
         } catch (Exception e) {
             throw new RuntimeException("Lecture upsert failed", e);
         }

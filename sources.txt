@@ -3,6 +3,8 @@ src/ui/attendee/AttendanceHistoryPanel.java
 src/ui/attendee/AttendeeDashboard.java
 src/ui/MainFrame.java
 src/ui/components/ToastNotification.java
+src/ui/components/PanelHeader.java
+src/ui/components/UiStyle.java
 src/ui/components/CircularProgressBar.java
 src/ui/components/StatusBadge.java
 src/ui/components/ShakeAnimation.java
