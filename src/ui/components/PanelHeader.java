@@ -22,7 +22,7 @@ public class PanelHeader extends JLabel {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setColor(Constants.ACCENT);
         g2.setStroke(new BasicStroke(1f));
-        int y = getHeight() - 5;
+        int y = getHeight() - 2;
         g2.drawLine(0, y, getWidth(), y);
         g2.dispose();
     }

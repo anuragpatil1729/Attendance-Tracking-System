@@ -51,8 +51,8 @@ public class MainFrame extends JFrame {
             try {
                 int activated = sessionService.activateScheduled();
                 if (activated > 0) {
-                    SwingUtilities.invokeLater(() -> ToastNotification.showInfo(MainFrame.this,
-                            "Activated " + activated + " scheduled session(s)."));
+                    ToastNotification.showInfo(MainFrame.this,
+                            "Activated " + activated + " scheduled session(s).");
                 }
             } catch (Exception ignored) {
             }

@@ -200,6 +200,7 @@ public class SessionManagerPanel extends JPanel {
                             openNowSelected ? "Session opened 🚀" : "Session scheduled ⏱");
                     loadSessions();
                     name.setText("");
+                    scheduleDateTime.setValue(new java.util.Date());
                     subject.setText("");
                 } catch (Exception ex) {
                     ToastNotification.showError(SessionManagerPanel.this, ex.getMessage());

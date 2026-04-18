@@ -65,7 +65,7 @@ public class AttendanceReportPanel extends JPanel {
         top.add(Box.createHorizontalStrut(8));
         top.add(rowCountLabel);
 
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         bottom.setOpaque(false);
         bottom.add(thresholdLabel);
 

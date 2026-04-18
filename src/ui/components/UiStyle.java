@@ -24,8 +24,8 @@ public final class UiStyle {
 
     public static Border sectionBorder(int radius) {
         return BorderFactory.createCompoundBorder(
-                roundedBorder(radius),
-                BorderFactory.createMatteBorder(0, 3, 0, 0, Constants.ACCENT));
+                BorderFactory.createMatteBorder(0, 3, 0, 0, Constants.ACCENT),
+                roundedBorder(radius));
     }
 
     public static JPanel sectionCard(LayoutManager layout, int radius) {
